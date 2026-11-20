@@ -1,0 +1,15 @@
+{
+  "name": "restep-spec",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "Restep 1, a specification for HTTP JSON APIs at REST level 2½",
+  "homepage": "https://restep.wubytes.com/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/restep-spec/spec.git"
+  },
+  "scripts": {
+    "test": "node test.mjs"
+  }
+}

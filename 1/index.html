@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Restep 1: specification (draft)</title>
+<meta name="description" content="The Restep 1 specification: the core, query, writes, relations and sync profiles, extensions, error codes, discovery and conformance.">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#ff6a3d">
+<link rel="canonical" href="https://restep.wubytes.com/1/">
+<link rel="alternate" hreflang="en" href="https://restep.wubytes.com/1/">
+<link rel="alternate" hreflang="es" href="https://restep.wubytes.com/es/1/">
+<link rel="alternate" hreflang="x-default" href="https://restep.wubytes.com/1/">
+<link rel="alternate" type="text/markdown" href="https://restep.wubytes.com/1/spec.md">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Restep · wubytes">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="es_ES">
+<meta property="og:url" content="https://restep.wubytes.com/1/">
+<meta property="og:title" content="Restep 1: specification (draft)">
+<meta property="og:description" content="The five Restep profiles, its extensions, the error codes, and what a server must do to announce each one.">
+<meta property="og:image" content="https://restep.wubytes.com/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A staircase: Richardson levels 0 to 2 and, above them, the five Restep profiles, next to the title “Restep: REST level 2½”.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="wrap">
+<header class="site">
+  <a class="brand" href="/"><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><rect x="1.5" y="1.5" width="37" height="37" rx="5" fill="#ff6a3d" stroke="#161616" stroke-width="3"/><path d="M8 31h8v-7h7v-7h7v-7" fill="none" stroke="#161616" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/></svg>Restep<small>2½</small></a>
+  <nav aria-label="Sections"><a href="/">Overview</a><a href="/1/" aria-current="page">Specification</a><a href="/tools/">Tools</a><a href="/ref/restep-server.mjs">Reference code</a><a class="lang" href="/es/1/" hreflang="es" lang="es">Español</a></nav>
+</header>
+
+<div class="spec">
+<nav class="toc ink" aria-label="Specification contents">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#status">Status and scope</a><ol><li><a href="#restep-versions">Restep versions</a></li><li><a href="#dependencies">Profiles and dependencies</a></li></ol></li>
+    <li><a href="#terms">Terms</a></li>
+    <li><a href="#data">Data</a></li>
+    <li><a href="#announcing">Announcing Restep</a></li>
+    <li><a href="#core">core</a>
+      <ol><li><a href="#resources">Resources and methods</a></li><li><a href="#collections">Collections</a></li><li><a href="#reserved">Reserved parameters</a></li><li><a href="#errors">Errors</a></li><li><a href="#versions">Evolution and versions</a></li><li><a href="#language">Language of the texts</a></li><li><a href="#inheritance">Inherited values</a></li></ol></li>
+    <li><a href="#query">query</a></li>
+    <li><a href="#writes">writes</a></li>
+    <li><a href="#relations">relations</a></li>
+    <li><a href="#sync">sync</a></li>
+    <li><a href="#extensions">Extensions</a>
+      <ol><li><a href="#actions">actions</a></li><li><a href="#batch">batch</a></li><li><a href="#filter-expr">filter-expr</a></li><li><a href="#query-method">query-method</a></li><li><a href="#oauth">oauth</a></li></ol></li>
+    <li><a href="#conformance">Conformance</a></li>
+    <li><a href="#open">Open questions</a></li>
+    <li><a href="#references">References</a></li>
+  </ol>
+</nav>
+
+<main id="main" class="doc">
+<section aria-labelledby="status">
+  <h1 class="kicker">Restep 1 · specification</h1>
+  <h2 id="status">1. Status and scope</h2>
+  <div class="status ink">
+    <p><strong>Draft 5</strong>, 20 November 2026 (draft 4, draft 3 and draft 2: 19 November 2026; draft 1: 12 November 2026). It may change without notice until version 1.0 is published.</p>
+    <p>URI of this version: <code>https://restep.wubytes.com/1/</code></p>
+    <p>Published in English and in <a href="/es/1/" hreflang="es" lang="es">Spanish</a>. Where the two differ, the English text prevails; profile and error URIs point to it.</p>
+    <p>Also as a single Markdown file, for agents and for diffing: <a href="/1/spec.md"><code>spec.md</code></a>.</p>
+  </div>
+  <p>Restep is a profile for HTTP APIs that exchange JSON and are organised around resources: level 2 of the Richardson Maturity Model. It settles what that level leaves open (the shape of collections and errors, querying, safe writes, relationships and sync) and splits it into five <strong>profiles</strong> that are adopted one at a time, plus optional <strong>extensions</strong>.</p>
+  <p>Out of scope: authentication and authorization (OAuth 2.0 is recommended, with OpenID Connect where the API needs the user’s identity; the <a href="#oauth"><code>oauth</code></a> extension says where a client gets a token), each API’s domain design, and anything below HTTP. Restep requires no schema and no code generator: a <code>core</code> server can be written by hand.</p>
+  <h3 id="restep-versions">1.1 Restep versions</h3>
+  <ul>
+    <li>Restep has a major and a minor version. The major one is in all its URIs (<code>/1/</code>); the discovery document declares the full one: <code>"restep": "1.0"</code>.</li>
+    <li>A minor version only adds: profiles, extensions, discovery fields, or error codes for new cases (never a new code for a case that already had one). Whatever conforms to 1.0 still conforms to 1.1. Adding error codes is safe because clients handle unknown ones by the class of the status (<a href="#errors">5.4</a>).</li>
+    <li>A minor version <span class="must">MUST NOT</span> reserve parameter names beyond those listed in <a href="#reserved">5.3</a>, except names starting with <code>$</code>, which are kept for future versions of Restep.</li>
+    <li>An incompatible change will be Restep 2, with new URIs (<code>/2/core</code>…). The <code>/1/</code> URIs will never move.</li>
+    <li>Until 1.0 is published, drafts may change incompatibly.</li>
+  </ul>
+  <h3 id="dependencies">1.2 Profiles and dependencies</h3>
+  <p>Each profile only adds requirements; none changes the type or meaning of what an earlier one defines, so announcing a new profile never breaks an existing client. Some profiles need others:</p>
+  <div class="tbl" tabindex="0"><table>
+    <thead><tr><th scope="col">Profile or extension</th><th scope="col">Requires</th></tr></thead>
+    <tbody>
+      <tr><td><code>core</code></td><td>Nothing; every Restep API implements it</td></tr>
+      <tr><td><code>query</code>, <code>writes</code>, <code>relations</code></td><td><code>core</code></td></tr>
+      <tr><td><code>sync</code></td><td><code>core</code> and <code>query</code> (to fetch changed items by <code>id</code>)</td></tr>
+      <tr><td><code>actions</code>, <code>batch</code>, <code>oauth</code></td><td><code>core</code></td></tr>
+      <tr><td><code>filter-expr</code>, <code>query-method</code></td><td><code>query</code></td></tr>
+    </tbody>
+  </table></div>
+  <p>A server <span class="must">MUST NOT</span> announce a profile or extension without the ones it requires.</p>
+</section>
+
+<section aria-labelledby="terms">
+  <h2 id="terms">2. Terms</h2>
+  <p>The key words <span class="must">MUST</span>, <span class="must">MUST NOT</span>, <span class="must">SHOULD</span>, <span class="must">SHOULD NOT</span> and <span class="must">MAY</span> are to be interpreted as described in <a class="src" href="https://www.rfc-editor.org/rfc/rfc2119"><strong>RFC 2119</strong></a> and <a class="src" href="https://www.rfc-editor.org/rfc/rfc8174"><strong>RFC 8174</strong></a> when, and only when, they appear in all capitals. Every requirement of this specification carries one of them; sentences without them explain or give examples.</p>
+  <ul>
+    <li><strong>API root</strong>: the base URL a client is configured with, such as <code>https://api.example.com/</code> or <code>https://example.com/api/</code>. Paths in this specification and in the <code>path</code> members of discovery and batch, such as <code>/books</code>, are relative to it: under <code>https://example.com/api/</code>, <code>/books</code> means <code>https://example.com/api/books</code>. Links in bodies and headers are not: they are URI references (<a class="src" href="https://www.rfc-editor.org/rfc/rfc3986"><strong>RFC 3986</strong></a>) resolved against the request URL.</li>
+    <li><strong>Collection</strong>: a resource grouping items of the same type, such as <code>/books</code>.</li>
+    <li><strong>Item</strong>: a resource in a collection, such as <code>/books/7</code>.</li>
+    <li><strong>Profile</strong>: a named set of requirements (<code>core</code>, <code>query</code>…) with its own URI.</li>
+    <li><strong>Reserved parameter</strong>: a query parameter whose meaning Restep defines (<a href="#reserved">section 5.3</a>).</li>
+    <li><strong>Principal</strong>: who a request acts for, as the server authenticates it (in OAuth 2.0, the client and, if there is one, the user). It is not the credential: a request with a renewed token comes from the same principal.</li>
+    <li><strong>Capability</strong>: something a resource declares in discovery (a filter, an operator, a sort key, a relationship, an action).</li>
+  </ul>
+</section>
+
+<section aria-labelledby="data">
+  <h2 id="data">3. Data</h2>
+  <ul>
+    <li>Bodies <span class="must">MUST</span> be JSON (<a class="src" href="https://www.rfc-editor.org/rfc/rfc8259"><strong>RFC 8259</strong></a>) encoded as UTF-8. The exceptions are responses without a body (<code>204</code>, <code>304</code>, <code>HEAD</code>) and the event stream of <a href="#sync"><code>sync</code></a>.</li>
+    <li>Field names defined by Restep are <code>snake_case</code>. Each API chooses its own, but <span class="must">SHOULD</span> stick to one convention.</li>
+    <li>Member names starting with <code>_</code> are reserved for Restep (such as <code>_actions</code>, <code>_etag</code>). An API <span class="must">MUST NOT</span> define fields with that prefix.</li>
+    <li>An item’s identifier is called <code>id</code>. It <span class="must">MUST</span> be a non-empty string made only of <a class="src" href="https://www.rfc-editor.org/rfc/rfc3986"><strong>RFC 3986</strong></a> unreserved characters (<code>A–Z a–z 0–9 - . _ ~</code>), so it can go into a path without escaping, and <span class="must">MUST NOT</span> be <code>.</code> or <code>..</code>, which URI resolution would remove. It <span class="must">MUST NOT</span> change.</li>
+    <li>A field whose values may fall outside ±(2<sup>53</sup>−1), or that needs exact decimal arithmetic (amounts of money), <span class="must">MUST</span> be a string in every representation, whatever the value: <code>"price": "18.50"</code>. An amount of money <span class="must">SHOULD</span> come with its ISO 4217 currency.</li>
+    <li>Instants <span class="must">MUST</span> follow <a class="src" href="https://www.rfc-editor.org/rfc/rfc3339"><strong>RFC 3339</strong></a> <code>date-time</code> with an offset: <code>"2026-11-12T09:30:00Z"</code>. Calendar dates <span class="must">MUST</span> use <code>full-date</code>: <code>"1987-03-14"</code>. Durations <span class="must">SHOULD</span> be ISO 8601 (<code>"PT90S"</code>); a field holding seconds as a number <span class="must">SHOULD</span> end in <code>_seconds</code>.</li>
+    <li>Absent and <code>null</code> are different. On reads, a field with no value <span class="must">MAY</span> be omitted or set to <code>null</code>, except a language map, which is <code>{}</code>; in a <code>PATCH</code>, <code>null</code> deletes and absent leaves untouched (<a class="src" href="https://www.rfc-editor.org/rfc/rfc7396"><strong>RFC 7396</strong></a>).</li>
+    <li>A <strong>relationship</strong>, when a representation includes one, <span class="must">MUST</span> be an object with at least <code>id</code> (to-one), a list of such objects (to-many), <code>null</code> (an empty to-one) or <code>[]</code> (an empty to-many). Never a bare identifier, so the field’s type does not change when the related item is included (<a href="#relations">section 8</a>). When a relationship can point to more than one collection, each object <span class="must">MUST</span> also carry <code>type</code> with the target collection’s name.</li>
+    <li>Links in bodies (<code>next</code>, <code>href</code>) <span class="must">MUST</span> be absolute URIs or absolute paths, starting with <code>/</code> and including the API root’s path (<code>/api/books?cursor=…</code>), so a colon inside a segment (<code>/orders/2001:cancel</code>) is never read as a scheme, as it would be in the relative reference <code>2001:cancel</code>.</li>
+    <li>Clients <span class="must">MUST</span> ignore fields they do not know and tolerate new enum values.</li>
+    <li>Successful (<code>2xx</code>) responses of collections, items and actions <span class="must">MUST NOT</span> depend on <code>Accept-Language</code>, and do not need <code>Vary: Accept-Language</code>. Numbers, amounts, dates, instants and durations always take the forms of this section; presenting them in a language is the client’s job. Only the API’s own texts change with the language (<a href="#language">5.6</a>).</li>
+    <li id="language-maps">A <strong>language map</strong> holds the same text in several languages: a JSON object whose keys are language tags (<a class="src" href="https://www.rfc-editor.org/rfc/rfc5646"><strong>RFC 5646</strong></a>) and whose values are strings. Only top-level fields of an item can be language maps. Restep says nothing about the language of text fields that are not.
+<pre tabindex="0"><code><span class="s">"name"</span>: { <span class="s">"en"</span>: <span class="s">"Zucchini"</span>, <span class="s">"en-gb"</span>: <span class="s">"Courgette"</span>, <span class="s">"es-es"</span>: <span class="s">"Calabacín"</span>, <span class="s">"es-mx"</span>: <span class="s">"Calabacita"</span> }</code></pre>
+      <ul>
+        <li>Each key <span class="must">MUST</span> be a well-formed tag (the grammar of <a class="src" href="https://www.rfc-editor.org/rfc/rfc5646#section-2.1"><strong>RFC 5646</strong></a>, section 2.1; it need not be in the registry) in lowercase. The server <span class="must">MUST NOT</span> change a key (<code>iw</code> does not become <code>he</code>). A value can be any string, <code>""</code> included.</li>
+        <li>A language map’s type <span class="must">MUST NOT</span> change: it is an object with one translation or none, even if the API speaks one language. A map with no translations <span class="must">MUST</span> be given as <code>{}</code>, not absent or <code>null</code>, unless the representation leaves the field out (through <code>fields</code> or permissions). The server <span class="must">MUST NOT</span> fill a missing translation with another language’s text: the client picks what to show from the keys it gets.</li>
+        <li>In a <code>POST</code>, a language map is an object of strings. In a <code>PATCH</code> it merges like any object (<a class="src" href="https://www.rfc-editor.org/rfc/rfc7396"><strong>RFC 7396</strong></a>): <code>{"name": {"fr": "Courgette"}}</code> adds or changes French and leaves the rest, <code>{"name": {"fr": null}}</code> deletes it, and deleting a key that is not there does nothing. After merging, a missing language map is <code>{}</code>, so <code>{"name": null}</code> empties it. A declared <code>update</code> schema (<a href="#describing">4.3</a>) <span class="must">MUST</span> accept <code>null</code> for the field and for any well-formed lowercase key.</li>
+        <li>The server <span class="must">MUST</span> validate the body before merging, including the keys it deletes, and <span class="must">MUST</span> answer <code>422 invalid</code> with one <code>errors</code> entry per failure, with a <code>pointer</code> to what fails and this <code>code</code>: <code>type</code> if the field is not an object or a value is not a string (in a <code>PATCH</code>, <code>null</code> is valid in both places; in a <code>POST</code> it is not); <code>format</code> if a key is not a well-formed lowercase tag (<code>/name/ES</code>); <code>unknown</code> if a translation is added, or given a value other than the stored one, under a well-formed tag the API does not accept.</li>
+      </ul>
+    </li>
+  </ul>
+</section>
+
+<section aria-labelledby="announcing">
+  <h2 id="announcing">4. Announcing Restep</h2>
+  <h3 id="profile-header">4.1 Profile header</h3>
+  <p>Every API response <span class="must">SHOULD</span> carry one <code>rel="profile"</code> link (<a class="src" href="https://www.rfc-editor.org/rfc/rfc6906"><strong>RFC 6906</strong></a>) per implemented profile and extension. A profile’s URI is the version URI followed by its name:</p>
+<pre tabindex="0"><code><span class="h">Link:</span> &lt;https://restep.wubytes.com/1/core&gt;; rel="profile",
+      &lt;https://restep.wubytes.com/1/query&gt;; rel="profile"</code></pre>
+  <p>Profiles apply to the whole API. Which collection supports what is said only by the declarations in the discovery document.</p>
+  <h3 id="discovery">4.2 Discovery document</h3>
+  <p>A <code>GET</code> on the API root returns a document stating the server’s profiles, extensions and capabilities. A <code>core</code>-only server <span class="must">SHOULD</span> serve it; a server that announces any other profile or extension, or has language maps (<a href="#data">3</a>), <span class="must">MUST</span> serve it. A server whose root is taken <span class="must">MAY</span> serve it elsewhere and point to it from its responses with <code>Link: &lt;…&gt;; rel="service-desc"</code> (<a class="src" href="https://www.rfc-editor.org/rfc/rfc8631"><strong>RFC 8631</strong></a>). A response <span class="must">MAY</span> carry several <code>service-desc</code> links, such as one to an OpenAPI document; the one to the discovery document <span class="must">SHOULD</span> carry <code>type="application/json"</code>, and clients <span class="must">MUST</span> use the first target that is a discovery document.</p>
+  <p>Clients <span class="must">MUST</span> treat a response as a discovery document only if it is a JSON object with a string member <code>restep</code>. Without one, clients <span class="must">MUST</span> assume <code>core</code> only. If the <code>Link</code> header and the document disagree, the document prevails.</p>
+<pre tabindex="0"><code>{ <span class="s">"restep"</span>: <span class="s">"1.0"</span>,
+  <span class="s">"version"</span>: <span class="s">"1"</span>,
+  <span class="s">"profiles"</span>: [<span class="s">"core"</span>, <span class="s">"query"</span>, <span class="s">"writes"</span>, <span class="s">"relations"</span>, <span class="s">"sync"</span>],
+  <span class="s">"extensions"</span>: [<span class="s">"actions"</span>, <span class="s">"batch"</span>],
+  <span class="s">"batch"</span>: { <span class="s">"path"</span>: <span class="s">"/batch"</span>, <span class="s">"max_operations"</span>: 20 },
+  <span class="s">"idempotency"</span>: { <span class="s">"ttl"</span>: 86400 },
+  <span class="s">"events"</span>: <span class="s">"/events"</span>,
+  <span class="s">"collections"</span>: {
+    <span class="s">"books"</span>: {
+      <span class="s">"path"</span>: <span class="s">"/books"</span>,
+      <span class="s">"description"</span>: <span class="s">"Books in the catalogue, one per edition."</span>,
+      <span class="s">"methods"</span>: [<span class="s">"GET"</span>, <span class="s">"POST"</span>],
+      <span class="s">"item_methods"</span>: [<span class="s">"GET"</span>, <span class="s">"PATCH"</span>, <span class="s">"DELETE"</span>],
+      <span class="s">"schemas"</span>: { <span class="s">"create"</span>: <span class="s">"/schemas/book-create.json"</span>, <span class="s">"update"</span>: <span class="s">"/schemas/book-update.json"</span> },
+      <span class="s">"filter"</span>: {
+        <span class="s">"id"</span>:        { <span class="s">"type"</span>: <span class="s">"string"</span>,  <span class="s">"ops"</span>: [<span class="s">"eq"</span>, <span class="s">"in"</span>] },
+        <span class="s">"price"</span>:     { <span class="s">"type"</span>: <span class="s">"decimal"</span>, <span class="s">"ops"</span>: [<span class="s">"eq"</span>, <span class="s">"lt"</span>, <span class="s">"le"</span>, <span class="s">"gt"</span>, <span class="s">"ge"</span>] },
+        <span class="s">"rating"</span>:    { <span class="s">"type"</span>: <span class="s">"number"</span>,  <span class="s">"ops"</span>: [<span class="s">"ge"</span>, <span class="s">"null"</span>] },
+        <span class="s">"category"</span>:  { <span class="s">"type"</span>: <span class="s">"enum"</span>, <span class="s">"values"</span>: [<span class="s">"novela-negra"</span>, <span class="s">"poesia"</span>], <span class="s">"ops"</span>: [<span class="s">"eq"</span>, <span class="s">"in"</span>] },
+        <span class="s">"author.id"</span>: { <span class="s">"type"</span>: <span class="s">"string"</span>,  <span class="s">"ops"</span>: [<span class="s">"eq"</span>, <span class="s">"in"</span>] } },
+      <span class="s">"sort"</span>: [<span class="s">"id"</span>, <span class="s">"price"</span>, <span class="s">"rating"</span>, <span class="s">"title"</span>],
+      <span class="s">"max_limit"</span>: 50,
+      <span class="s">"count"</span>: <span class="s">"estimated"</span>,
+      <span class="s">"relations"</span>: {
+        <span class="s">"author"</span>:  { <span class="s">"to"</span>: <span class="s">"authors"</span>, <span class="s">"include"</span>: true },
+        <span class="s">"reviews"</span>: { <span class="s">"to"</span>: <span class="s">"reviews"</span>, <span class="s">"many"</span>: true, <span class="s">"path"</span>: <span class="s">"/books/{id}/reviews"</span> } },
+      <span class="s">"include_depth"</span>: 2,
+      <span class="s">"sync"</span>: { <span class="s">"retention"</span>: 604800 },
+      <span class="s">"actions"</span>: { <span class="s">"reserve"</span>: { <span class="s">"on"</span>: <span class="s">"item"</span>, <span class="s">"safe"</span>: false, <span class="s">"idempotent"</span>: true,
+        <span class="s">"description"</span>: <span class="s">"Holds a copy for the user for 48 hours."</span>, <span class="s">"input"</span>: <span class="s">"/schemas/reserve.json"</span> } } },
+    <span class="s">"reviews"</span>: { <span class="s">"path"</span>: <span class="s">"/books/{id}/reviews"</span>, <span class="s">"sort"</span>: [<span class="s">"id"</span>, <span class="s">"created_at"</span>], <span class="s">"max_limit"</span>: 50 } } }</code></pre>
+  <p>An API <span class="must">SHOULD</span> link its documentation for people with <code>Link: &lt;…&gt;; rel="service-doc"</code> (<a class="src" href="https://www.rfc-editor.org/rfc/rfc8631"><strong>RFC 8631</strong></a>) in the response that serves its discovery document or, if it serves none, in the response to a <code>GET</code> on the API root, with the API root as <code>anchor</code> (<a class="src" href="https://www.rfc-editor.org/rfc/rfc8288"><strong>RFC 8288</strong></a>) if that response is an error. A response <span class="must">MAY</span> carry several, and each <span class="must">MAY</span> state the languages of its target with <code>hreflang</code>; a client picks among them by <code>hreflang</code>, so the server need not choose them by <code>Accept-Language</code>. That documentation explains what discovery cannot say, such as business rules, the permissions each operation needs, usage limits and examples. Where it contradicts discovery, discovery prevails.</p>
+  <pre tabindex="0"><code><span class="h">Link:</span> &lt;https://docs.example.com/api/&gt;; rel="service-doc"; hreflang="es",
+      &lt;https://docs.example.com/en/api/&gt;; rel="service-doc"; hreflang="en"</code></pre>
+  <ul>
+    <li>Each profile adds its own fields to the document, described in its section. The members of the root and of each collection, <code>schemas</code>, filter, relation, action, deprecation, language map, reason and inheritance object belong to Restep, so a later minor version can add some: a server <span class="must">MAY</span> add its own, and their names <span class="must">MUST</span> start with <code>x-</code>. This does not apply to the names the API gives its collections, fields, relations, actions and reasons, which are keys of <code>collections</code>, <code>filter</code>, <code>relations</code>, <code>actions</code>, <code>language_maps</code>, <code>reasons</code> and <code>inherit</code>. Clients ignore what they do not know.</li>
+    <li><code>language_maps</code>: the fields of a collection that are language maps (<a href="#data">3</a>), as an object whose keys are the field names: <code>"language_maps": {"name": {}, "description": {}}</code>. It <span class="must">MUST</span> list all of them; if it is missing, the collection has none. The object of each field is left for minor versions.</li>
+    <li>A collection’s <code>path</code> <span class="must">MAY</span> be a URI template (<a class="src" href="https://www.rfc-editor.org/rfc/rfc6570"><strong>RFC 6570</strong></a>); subcollections are declared that way.</li>
+    <li>Field types, where discovery declares them, come from this list: <code>string</code>, <code>integer</code>, <code>number</code>, <code>decimal</code> (a string matching <code>-?[0-9]+(\.[0-9]+)?</code>), <code>boolean</code>, <code>date</code>, <code>datetime</code>, <code>duration</code> and <code>enum</code> (with its <code>values</code>). Discovery only declares types where Restep needs them, such as filters; the shape of whole representations and request bodies goes in the schemas of <a href="#describing">4.3</a>. A representation <span class="must">MAY</span> also link its schema with <code>rel="describedby"</code>.</li>
+    <li>An origin that lists its APIs in <code>/.well-known/api-catalog</code> (<a class="src" href="https://www.rfc-editor.org/rfc/rfc9727"><strong>RFC 9727</strong></a>) <span class="must">MAY</span> include a Restep API there, with the API root as <code>anchor</code>, a <code>service-desc</code> link to its discovery document and, if there are any, its <code>service-doc</code> links.</li>
+  </ul>
+
+  <h3 id="describing">4.3 Describing operations</h3>
+  <p>Optional members that let a client, a person reading the document or an agent picking a tool, know what each collection does and accepts without trying it. A server <span class="must">MAY</span> declare any of them on any collection; Restep requires none, so a <code>core</code> server can still be written by hand.</p>
+  <ul>
+    <li><code>methods</code> and <code>item_methods</code>: the methods a collection and its items support, out of <code>GET</code>, <code>POST</code>, <code>PATCH</code> and <code>DELETE</code> (<code>HEAD</code> goes with <code>GET</code>; actions and <code>QUERY</code> are announced on their own). A missing list means unknown, not all. A declared list <span class="must">MUST</span> be exact: a method left out gives <code>405</code>, unless an error that comes first in <a href="#errors">5.4</a> applies, a listed one never does, and the <code>Allow</code> header of a <code>405</code> <span class="must">MUST</span> list every declared method and no other of those four.</li>
+    <li><code>description</code>: a short plain-text explanation of a collection, a filter field, a relationship, an action, an inherited field (<a href="#inheritance">5.7</a>) or a reason (<a href="#errors">5.4</a>). It <span class="must">SHOULD</span> be one sentence.</li>
+    <li><code>schemas</code>: JSON Schemas (<a class="src" href="https://json-schema.org/draft/2020-12">2020-12</a>) of a collection’s <code>item</code> (its representation without <code>fields</code> or <code>include</code>), <code>create</code> (the body of a <code>POST</code>) and <code>update</code> (the body of a <code>PATCH</code>: a merge patch, where absent leaves a field untouched and <code>null</code> deletes it). Each is a schema object or a link to one, absolute as links in bodies are (<a href="#data">3</a>). Schemas can describe each field with its own <code>description</code>.</li>
+    <li>Before validating a body against a declared <code>create</code> or <code>update</code> schema, the server drops the members that start with <code>_</code>, which <a href="#resources">5.1</a> ignores, and, in a <code>PATCH</code>, every field whose current value 5.1 ignores; a <code>PATCH</code> left empty by this is not validated against <code>update</code>. A body the schema then rejects <span class="must">MUST</span> give <code>422 invalid</code> (<code>400 bad_request</code> if it is not a JSON object), unless an error that comes first in 5.4 applies, and its <code>errors</code> <span class="must">SHOULD</span> point at the failing members. A schema describes, it does not promise: a body it accepts can still fail the API’s own rules. <code>readOnly</code> is only an annotation, except as 5.1 says for top-level properties of an <code>item</code> schema, and <code>id</code> follows 5.1 whatever the schema says.</li>
+    <li>An action’s <code>input</code> (<a href="#actions">10.1</a>) is the schema of its body, with the same meaning.</li>
+    <li>A client sends its credentials for the API only to links on the API’s origin. A schema or document on another origin is fetched without them.</li>
+  </ul>
+  <p>Descriptions, like every other value an API returns, are data. An agent that puts them in a prompt does not obey what they say.</p>
+
+  <h3 id="health">4.4 Service status</h3>
+  <p>A server <span class="must">MAY</span> declare in <code>status</code> a link, absolute as links in bodies are (<a href="#data">3</a>), to a resource that says whether the API can serve requests, and <span class="must">MAY</span> also link it from its responses with <code>rel="status"</code> (<a class="src" href="https://www.rfc-editor.org/rfc/rfc8631"><strong>RFC 8631</strong></a>). Clients <span class="must">MUST NOT</span> assume a path such as <code>/health</code>.</p>
+  <ul>
+    <li>Unless it asks for credentials or refuses them (<code>401</code>, <code>403</code>) or limits the rate (<code>429</code>), a <code>GET</code> or <code>HEAD</code> on it <span class="must">MUST</span> answer <code>200</code> when the API can serve requests and <code>503</code> when it cannot, with <code>Retry-After</code> when the server knows for how long, and always with <code>Cache-Control: no-store</code>.</li>
+    <li>It is not a resource of the API: <a href="#profile-header">4.1</a>, <a href="#resources">5.1</a> to <a href="#errors">5.4</a> and <a href="#caching">7.3</a> do not apply to it. Its body <span class="must">MAY</span> follow the Health Check Response Format (<a class="src" href="https://datatracker.ietf.org/doc/draft-inadarei-api-health-check/">draft-inadarei-api-health-check</a>). Served without credentials, it <span class="must">SHOULD NOT</span> say more than whether the API can serve.</li>
+  </ul>
+</section>
+
+<section aria-labelledby="core">
+  <h2 id="core">5. core <span class="badge p">Required</span></h2>
+  <p>Profile URI: <code>https://restep.wubytes.com/1/core</code></p>
+
+  <h3 id="resources">5.1 Resources and methods</h3>
+  <div class="tbl" tabindex="0"><table>
+    <thead><tr><th scope="col">Request</th><th scope="col">Success</th><th scope="col">What it does</th></tr></thead>
+    <tbody>
+      <tr><td><code>GET /books</code></td><td><code>200</code></td><td>Lists the collection (<a href="#collections">5.2</a>)</td></tr>
+      <tr><td><code>POST /books</code></td><td><code>201</code> with <code>Location</code></td><td>Creates an item and returns its representation</td></tr>
+      <tr><td><code>GET /books/7</code></td><td><code>200</code></td><td>Returns the item, with no envelope</td></tr>
+      <tr><td><code>PATCH /books/7</code></td><td><code>200</code></td><td>Partial update with JSON Merge Patch (<a class="src" href="https://www.rfc-editor.org/rfc/rfc7396"><strong>RFC 7396</strong></a>), except relationship objects (below) and language maps (<a href="#data">3</a>); returns the whole item</td></tr>
+      <tr><td><code>DELETE /books/7</code></td><td><code>204</code></td><td>Deletes the item. Repeating it <span class="must">MAY</span> return <code>404</code></td></tr>
+    </tbody>
+  </table></div>
+  <ul>
+    <li>Responses <span class="must">MUST</span> use the statuses in the table for those operations, except where <a href="#minimal">7.4</a> allows a response without a body.</li>
+    <li><code>PUT</code> is outside Restep 1: a client that replaces a whole item would erase fields added to the item after that client was written. Clients <span class="must">SHOULD</span> use <code>PATCH</code>.</li>
+    <li><code>HEAD</code> <span class="must">MUST</span> be supported wherever <code>GET</code> is (<a class="src" href="https://www.rfc-editor.org/rfc/rfc9110"><strong>RFC 9110</strong></a>). <code>GET</code> and <code>HEAD</code> <span class="must">MUST NOT</span> have effects visible to the client.</li>
+    <li>A method the resource does not support <span class="must">MUST</span> return <code>405</code> with an <code>Allow</code> header. <code>OPTIONS</code> is outside Restep: servers <span class="must">MAY</span> answer it for CORS.</li>
+    <li><code>PATCH</code> <span class="must">MUST</span> accept <code>application/merge-patch+json</code> and <span class="must">SHOULD</span> also accept <code>application/json</code> with the same meaning. A <code>415</code> to a <code>PATCH</code> <span class="must">SHOULD</span> carry <code>Accept-Patch</code> (<a class="src" href="https://www.rfc-editor.org/rfc/rfc5789"><strong>RFC 5789</strong></a>). A patch that is not a JSON object <span class="must">MUST</span> give <code>400 bad_request</code>.</li>
+    <li>An item’s path <span class="must">MUST</span> be its collection’s path, with any URI template expanded (<a class="src" href="https://www.rfc-editor.org/rfc/rfc6570"><strong>RFC 6570</strong></a>), its variables taking in order the <code>id</code>s of the parent items, and without a trailing <code>/</code>, followed by <code>/</code> and the item’s own <code>id</code>: <code>/books/7</code>, <code>/books/7/reviews/3</code>.</li>
+    <li>The server <span class="must">MUST</span> assign <code>id</code>, and <span class="must">MUST</span> give <code>422 invalid</code> to a <code>POST</code> that carries an <code>id</code> or a <code>PATCH</code> that carries a different one.</li>
+    <li>In a write, the server <span class="must">MUST</span> ignore members whose names start with <code>_</code>, so a client can send back a representation it read.</li>
+    <li>A <strong>read-only field</strong> is one no client can change with a <code>PATCH</code>: <code>id</code>, an effective field (<a href="#inheritance">5.7</a>), one only the server sets (<code>created_at</code>, a total), or a top-level property that the <code>item</code> schema marks <code>"readOnly": true</code> directly in its <code>properties</code> (<a href="#describing">4.3</a>); a server <span class="must">MUST NOT</span> mark so a property that some client or some state of the item lets change with a <code>PATCH</code>. A value in a <code>PATCH</code> is <strong>current</strong> when it is the field’s value as read, or when applying it as this section says (a relationship by its <code>id</code>, a language map by key) leaves the field as it was before the <code>PATCH</code>. If a <code>PATCH</code> carries a read-only field with its current value, the server <span class="must">MUST</span> ignore it; with another value, it <span class="must">MUST</span> respond <code>422 invalid</code> with a <code>read_only</code> entry whose <code>pointer</code> is the field, and <span class="must">MUST NOT</span> apply any of that request. A field that this client, or the item’s current state, does not let it change follows the first half of that rule: its current value <span class="must">MUST</span> be ignored, and another value gets the error the API gives a write it does not allow. For a field the client is allowed to read, the server compares after validating a language map as <a href="#data">3</a> says; for a field it cannot read, neither the rules above nor the checks of 3 that look at the stored value apply, and it <span class="must">MUST</span> answer the same whatever the value.</li>
+    <li>A valid <code>PATCH</code> that, setting aside the fields it ignores, would change no data of the item <span class="must">MUST NOT</span> change it: its representation and its <code>ETag</code>, if any, stay the same, and a field such as <code>updated_at</code> does not move. So the read-only fields of a representation that was read never make a <code>PATCH</code> fail or change anything, if the item has not changed since.</li>
+    <li>In a write, a relationship object is replaced whole, not merged: the server <span class="must">MUST</span> read only its <code>id</code> (and <code>type</code>) and <span class="must">MUST NOT</span> change the related item through it. <code>{"author": {"id": "4"}}</code> links another author; <code>{"author": null}</code> unlinks it. A to-many list is replaced whole, as Merge Patch does with any array.</li>
+  </ul>
+
+  <h3 id="collections">5.2 Collections</h3>
+  <p>A collection <span class="must">MUST</span> respond with an object holding <code>items</code> (a list) and <code>next</code>: the URL of the next page, or <code>null</code> when there are no more. <code>next</code> <span class="must">MUST</span> always be present, even if the server does not paginate yet.</p>
+<pre tabindex="0"><code>{ <span class="s">"items"</span>: [ { <span class="s">"id"</span>: <span class="s">"7"</span>, <span class="s">"title"</span>: <span class="s">"La niebla de Portugalete"</span> } ],
+  <span class="s">"next"</span>: null }</code></pre>
+  <ul>
+    <li>Clients <span class="must">MUST</span> follow <code>next</code> as is, without changing or building it, except for the parameters <a href="#pagination">6.4</a> lets them change between pages.</li>
+    <li>A collection <span class="must">MUST</span> have a deterministic default order. Without concurrent writes, following <code>next</code> until <code>null</code> <span class="must">MUST</span> return every item exactly once. With concurrent writes, items may be repeated or missed; a client that needs an exact copy uses <a href="#sync"><code>sync</code></a>.</li>
+    <li>The server picks the page size. Without the <code>query</code> profile, clients cannot change it.</li>
+    <li>The object <span class="must">MAY</span> carry other fields defined by profiles (<code>total</code>, <code>state</code>).</li>
+  </ul>
+
+  <h3 id="reserved">5.3 Reserved parameters: fail loudly</h3>
+  <p>These parameter names, with or without brackets, belong to Restep: <code>filter</code>, <code>sort</code>, <code>fields</code>, <code>include</code>, <code>count</code>, <code>limit</code>, <code>cursor</code>, <code>since</code> and <code>languages</code> (unused in Restep 1), plus any name starting with <code>$</code>.</p>
+  <div class="note"><p>Unless an error that comes first in <a href="#errors">5.4</a> applies, when a request uses a reserved parameter, or a form of one, that the resource does not implement for that method, the server <span class="must">MUST</span> respond <code>400</code> with the code <code>unsupported_parameter</code> and the parameter name, exactly as received after percent-decoding, in <code>parameter</code>. It <span class="must">MUST NOT</span> ignore it.</p></div>
+  <p>This is the rule that lets a server climb a step without breaking anyone: a client filtering against a server that cannot filter gets a clear error instead of the whole collection, as if the filter had been applied. Non-reserved parameters belong to each API, and Restep says nothing about them.</p>
+  <p>The two parameter codes tell a client whether to change the request or give up on the capability:</p>
+  <ul>
+    <li><code>unsupported_parameter</code> <span class="must">MUST</span> be used when the request asks for something the resource does not offer: a reserved parameter it does not implement, a parameter form it does not support (<code>filter=…</code> without <a href="#filter-expr"><code>filter-expr</code></a>, <code>sort[…]</code>), a filter field or operator, sort key or relationship that is not declared, or <code>count</code> on a collection that does not declare it. It applies to every method: <code>POST /books?filter[x]=1</code> gives it too.</li>
+    <li><code>invalid_parameter</code> <span class="must">MUST</span> be used when a supported capability gets a wrong value: a value that does not match the field’s type, a <code>limit</code> out of range, a field in <code>fields</code> that does not exist, an empty list, a repeated parameter, a bad cursor. Like <code>unsupported_parameter</code>, it <span class="must">MUST</span> carry in <code>parameter</code> the name of the parameter at fault, exactly as received after percent-decoding; for a missing one, its name; in the body of a <code>QUERY</code> (<a href="#query-method">10.4</a>), the name of the equivalent <code>GET</code> parameter, such as <code>filter[price][le]</code>, or the member’s own name when there is none.</li>
+  </ul>
+
+  <h3 id="errors">5.4 Errors</h3>
+  <p>Every <code>4xx</code> or <code>5xx</code> response the API generates <span class="must">MUST</span> use <code>application/problem+json</code> (<a class="src" href="https://www.rfc-editor.org/rfc/rfc9457"><strong>RFC 9457</strong></a>) when it has a body, with <code>type</code>, <code>title</code>, <code>status</code> (equal to the response’s) and a <code>code</code>. It <span class="must">SHOULD</span> carry <code>detail</code>, saying, where it can, how to fix the request (the accepted values, the allowed range), and <span class="must">MAY</span> carry <code>instance</code> and its own members. An error <span class="must">MUST NOT</span> be sent as a <code>200</code> response; the only place an error goes inside a <code>200</code> is a per-operation result of <a href="#batch"><code>batch</code></a>.</p>
+<pre tabindex="0"><code><span class="c">HTTP/1.1 422 Unprocessable Content
+Content-Type: application/problem+json</span>
+
+{ <span class="s">"type"</span>: <span class="s">"https://restep.wubytes.com/1/errors#invalid"</span>,
+  <span class="s">"title"</span>: <span class="s">"Invalid data"</span>,
+  <span class="s">"status"</span>: 422,
+  <span class="s">"code"</span>: <span class="s">"invalid"</span>,
+  <span class="s">"errors"</span>: [ { <span class="s">"pointer"</span>: <span class="s">"/price"</span>, <span class="s">"code"</span>: <span class="s">"required"</span>, <span class="s">"detail"</span>: <span class="s">"price is required."</span> } ] }</code></pre>
+  <ul>
+    <li><code>code</code> <span class="must">MUST</span> come from the table below. For a status the table does not list, <code>code</code> <span class="must">MUST</span> be that status’s description in the IANA HTTP Status Code Registry, in <code>snake_case</code> (<code>502</code> → <code>bad_gateway</code>, <code>431</code> → <code>request_header_fields_too_large</code>), or <code>http_</code> followed by the number for an unregistered status.</li>
+    <li><code>type</code> <span class="must">SHOULD</span> be <code>https://restep.wubytes.com/1/errors#</code> followed by the code, or a URI of the API’s own that documents the case. It <span class="must">MAY</span> be <code>about:blank</code>.</li>
+    <li>For errors of the API’s domain (insufficient funds, out of stock) the response <span class="must">MAY</span> add <code>reason</code>: a <code>snake_case</code> string defined by the API and stable within a version. <code>code</code> keeps the class (<code>conflict</code>, <code>invalid</code>), so a generic client still knows what to do.</li>
+    <li>The API <span class="must">MAY</span> declare its reasons in discovery, in <code>reasons</code> at the root: an object whose keys are the values of <code>reason</code>; each value carries the <code>code</code> that reason comes with and <span class="must">MAY</span> carry a <code>description</code> (<a href="#describing">4.3</a>): <code>"reasons": {"out_of_stock": {"code": "conflict", "description": "No copies left to reserve."}}</code>. If declared, it <span class="must">MUST</span> be complete: a problem <span class="must">MUST NOT</span> carry a <code>reason</code> that is not in it, nor carry it with another <code>code</code>. This applies to the top-level <code>reason</code> of every problem, also those in <a href="#batch"><code>batch</code></a> results, and not to the API’s own codes inside <code>errors</code>. If <code>reasons</code> is missing, which reasons exist is unknown. A client treats a <code>reason</code> it does not know by its <code>code</code>.</li>
+    <li>Validation errors <span class="must">SHOULD</span> list the problems in <code>errors</code>. Each entry has a <code>pointer</code> (a JSON Pointer, <a class="src" href="https://www.rfc-editor.org/rfc/rfc6901"><strong>RFC 6901</strong></a>, into the request body; Restep uses the plain string form, not the URI fragment), or a <code>parameter</code> or <code>header</code> name, plus a <code>code</code>: <code>required</code>, <code>type</code>, <code>format</code>, <code>range</code>, <code>too_long</code>, <code>unknown</code>, <code>read_only</code>, or one of the API’s own.</li>
+    <li>A <code>401</code> <span class="must">MUST</span> carry <code>WWW-Authenticate</code> (<a class="src" href="https://www.rfc-editor.org/rfc/rfc9110"><strong>RFC 9110</strong></a>).</li>
+    <li>Clients <span class="must">MUST</span> handle a <code>code</code> they do not know according to the class of the <code>status</code>.</li>
+    <li>When more than one of these errors applies to a request, the server <span class="must">MUST</span> report the first in this order: <code>401</code>, <code>403</code>, <code>404</code>, <code>410</code>, <code>405</code>, <code>400</code>, <code>415</code>, <code>406</code>, <code>413</code>, <code>428</code>, <code>412</code>, <code>422</code>, <code>409</code>. Within <code>400</code>, <code>unsupported_parameter</code> and <code>invalid_parameter</code> come before <code>bad_request</code>; other codes that share a status are not ordered. The order also decides between errors that other sections require (<a href="#describing">4.3</a>, 5.3, <a href="#sync">9</a>, <a href="#extensions">10</a>). Before giving an error, the server <span class="must">MUST</span> rule out the earlier ones it can check; it need not parse a body whose media type it rejects, read past its size limit, or validate the operations of a batch that exceeds <code>max_operations</code>, to look for another. Whether conditional headers are evaluated at all follows <a class="src" href="https://www.rfc-editor.org/rfc/rfc9110#section-13.2.1"><strong>RFC 9110</strong></a> (section 13.2.1); when they are, this order prevails over the point at which <a class="src" href="https://www.rfc-editor.org/rfc/rfc9110#section-13.2.2"><strong>RFC 9110</strong></a> (section 13.2.2) evaluates them, so a body that is not JSON gives <code>400</code> before a failed precondition. The order says nothing about statuses it does not list, such as <code>414</code>, <code>424</code>, <code>429</code> and <code>5xx</code>. When the API does not reveal whether a resource exists, that case is a <code>404</code>, not a <code>403</code>; a retired resource gives <code>410</code>, not <code>404</code>, unless its existence is concealed.</li>
+  </ul>
+  <div class="tbl" tabindex="0"><table>
+    <thead><tr><th scope="col"><code>code</code></th><th scope="col">Status</th><th scope="col">When</th><th scope="col">Profile</th></tr></thead>
+    <tbody>
+      <tr id="bad_request"><td><code>bad_request</code></td><td>400</td><td>The body is not JSON or does not have the expected shape; a malformed header</td><td>core</td></tr>
+      <tr id="invalid_parameter"><td><code>invalid_parameter</code></td><td>400</td><td>A supported parameter has a wrong value (<a href="#reserved">5.3</a>)</td><td>core</td></tr>
+      <tr id="unsupported_parameter"><td><code>unsupported_parameter</code></td><td>400</td><td>The resource does not offer what the parameter asks for (<a href="#reserved">5.3</a>)</td><td>core</td></tr>
+      <tr id="idempotency_key_required"><td><code>idempotency_key_required</code></td><td>400</td><td>The resource requires <code>Idempotency-Key</code> and it is missing</td><td>writes</td></tr>
+      <tr id="unauthenticated"><td><code>unauthenticated</code></td><td>401</td><td>Missing or invalid credentials; sent with <code>WWW-Authenticate</code></td><td>core</td></tr>
+      <tr id="forbidden"><td><code>forbidden</code></td><td>403</td><td>Valid credentials without permission for this, where the client may know the resource exists</td><td>core</td></tr>
+      <tr id="not_found"><td><code>not_found</code></td><td>404</td><td>The resource does not exist, or its existence is not to be revealed</td><td>core</td></tr>
+      <tr id="method_not_allowed"><td><code>method_not_allowed</code></td><td>405</td><td>The resource does not support that method; sent with <code>Allow</code></td><td>core</td></tr>
+      <tr id="not_acceptable"><td><code>not_acceptable</code></td><td>406</td><td>The server cannot produce any type in <code>Accept</code></td><td>core</td></tr>
+      <tr id="conflict"><td><code>conflict</code></td><td>409</td><td>Clashes with the current state: a duplicate, an impossible transition, the same request as one still in progress under the same <code>Idempotency-Key</code> (<a href="#idempotency">7.1</a>)</td><td>core</td></tr>
+      <tr id="state_expired"><td><code>state_expired</code></td><td>410</td><td>The server can no longer compute changes since that state</td><td>sync</td></tr>
+      <tr id="retired"><td><code>retired</code></td><td>410</td><td>A resource or action removed after its <code>Sunset</code> date (<a href="#versions">5.5</a>)</td><td>core</td></tr>
+      <tr id="precondition_failed"><td><code>precondition_failed</code></td><td>412</td><td>A precondition (<code>If-Match</code>, <code>If-None-Match</code>) failed: someone changed the resource, or it already exists</td><td>writes</td></tr>
+      <tr id="content_too_large"><td><code>content_too_large</code></td><td>413</td><td>The body is too large, or a batch exceeds <code>max_operations</code></td><td>core</td></tr>
+      <tr id="uri_too_long"><td><code>uri_too_long</code></td><td>414</td><td>The URL is too long (see <a href="#query-method"><code>query-method</code></a>)</td><td>core</td></tr>
+      <tr id="unsupported_media_type"><td><code>unsupported_media_type</code></td><td>415</td><td>Content type not supported</td><td>core</td></tr>
+      <tr id="invalid"><td><code>invalid</code></td><td>422</td><td>The body is understood but not valid; details in <code>errors</code></td><td>core</td></tr>
+      <tr id="idempotency_mismatch"><td><code>idempotency_mismatch</code></td><td>422</td><td>The same <code>Idempotency-Key</code> with a different request</td><td>writes</td></tr>
+      <tr id="not_executed"><td><code>not_executed</code></td><td>424</td><td>A batch operation that left no effect because another one failed</td><td>batch</td></tr>
+      <tr id="precondition_required"><td><code>precondition_required</code></td><td>428</td><td>The resource requires <code>If-Match</code> to write</td><td>writes</td></tr>
+      <tr id="rate_limited"><td><code>rate_limited</code></td><td>429</td><td>Too many requests; <span class="must">SHOULD</span> come with <code>Retry-After</code></td><td>core</td></tr>
+      <tr id="internal"><td><code>internal</code></td><td>500</td><td>Server failure</td><td>core</td></tr>
+      <tr id="not_implemented"><td><code>not_implemented</code></td><td>501</td><td>The server does not know the method (such as <code>QUERY</code>)</td><td>core</td></tr>
+      <tr id="unavailable"><td><code>unavailable</code></td><td>503</td><td>Temporarily unavailable; <span class="must">SHOULD</span> come with <code>Retry-After</code></td><td>core</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 id="versions">5.5 Evolution and versions</h3>
+  <p>A Restep API evolves without versions as long as changes are compatible, and only creates a major version when there is no other way.</p>
+  <p><strong>Compatible changes.</strong> A server <span class="must">MAY</span> make them at any time: adding fields to a representation; adding optional parameters, collections, actions or enum values; supporting new filters, sorts or includes; adding profiles or extensions; declaring <code>reasons</code> or adding reasons to it (<a href="#errors">5.4</a>). They work because clients ignore what they do not know (<a href="#data">section 3</a>).</p>
+  <p><strong>Breaking changes.</strong> A server <span class="must">MUST NOT</span> make them within a version, except through retirement (below):</p>
+  <ul>
+    <li>removing or renaming a field, or changing its type or meaning;</li>
+    <li>making an input field, parameter or header required when it was not (including <code>If-Match</code> through <code>428</code>, and <code>Idempotency-Key</code>);</li>
+    <li>tightening validation so that a request accepted before is now rejected (making read-only a field that could be written, too), unless it closes a security hole;</li>
+    <li>removing a declared filter, sort, relationship, action, collection, profile or method (<a href="#describing">4.3</a>);</li>
+    <li>changing the format of <code>id</code>s, resource URLs or a collection’s default order;</li>
+    <li>changing the status or the <code>code</code> returned for the same case;</li>
+    <li>removing <code>reasons</code> once declared, removing a reason from it, or changing a reason’s <code>code</code>.</li>
+  </ul>
+  <p><strong>Retiring.</strong> Within a version, a field or a declared capability can only disappear by retiring it:</p>
+  <ul>
+    <li>It is announced first. Discovery <span class="must">MUST</span> list it in <code>deprecations</code>, at the root for a version or a collection and in the collection for the rest: <code>{"kind": "field", "name": "rating", "sunset": "2027-07-01T00:00:00Z"}</code>, where <code>kind</code> is <code>version</code>, <code>collection</code>, <code>field</code>, <code>filter</code>, <code>sort</code>, <code>relation</code>, <code>action</code>, <code>method</code> or <code>item_method</code> (with the method as <code>name</code>), and <code>sunset</code>, once there is a date, is an <a class="src" href="https://www.rfc-editor.org/rfc/rfc3339"><strong>RFC 3339</strong></a> instant. Responses that use it <span class="must">MUST</span> carry <code>Deprecation</code> (<a class="src" href="https://www.rfc-editor.org/rfc/rfc9745"><strong>RFC 9745</strong></a>) and a <code>Link</code> with <code>rel="deprecation"</code> to the explanation. When what is retired is a whole resource, an action or a version, its responses <span class="must">MUST</span> also carry <code>Sunset</code> (<a class="src" href="https://www.rfc-editor.org/rfc/rfc8594"><strong>RFC 8594</strong></a>, as an HTTP-date) once there is a date.</li>
+    <li>At least six months <span class="must">SHOULD</span> pass between the notice and the removal.</li>
+    <li>After the date, a retired resource, action or version <span class="must">MUST</span> respond <code>410 retired</code>; a retired filter, sort or relationship <span class="must">MUST</span> give <code>400 unsupported_parameter</code>, like any undeclared one; a retired method gives <code>405</code>; a retired field is simply absent.</li>
+  </ul>
+  <pre tabindex="0"><code><span class="k">GET</span> https://api.example.com/v1/books/7
+<span class="c">→ 200</span>
+<span class="h">Deprecation:</span> @1798761600
+<span class="h">Sunset:</span> Thu, 01 Jul 2027 00:00:00 GMT
+<span class="h">Link:</span> &lt;/v2/&gt;; rel="successor-version",
+      &lt;https://docs.example.com/v2&gt;; rel="deprecation"
+
+<span class="k">GET</span> https://api.example.com/v1/books/7   <span class="c">after 1 July 2027</span>
+<span class="c">→ 410 application/problem+json</span>
+{ <span class="s">"type"</span>: <span class="s">"https://restep.wubytes.com/1/errors#retired"</span>, <span class="s">"title"</span>: <span class="s">"Retired"</span>, <span class="s">"status"</span>: 410, <span class="s">"code"</span>: <span class="s">"retired"</span> }</code></pre>
+  <p><strong>A new major version.</strong> A breaking change that cannot go through retirement requires one:</p>
+  <ul>
+    <li>The version <span class="must">MUST</span> go in the path, as <code>v</code> followed by an integer: <code>/v2/</code>. Each version is a separate API root with its own discovery document, which <span class="must">MUST</span> declare it as <code>"version": "2"</code>.</li>
+    <li>The version <span class="must">MUST NOT</span> go in headers, parameters or media types: in the path it is visible, cacheable and routable with no code. This leaves out date-based versioning in a header; see <a href="#open">open questions</a>.</li>
+    <li>The two versions <span class="must">MUST</span> link to each other with <code>Link</code> (<a class="src" href="https://www.rfc-editor.org/rfc/rfc5829"><strong>RFC 5829</strong></a>), at least in the discovery document: <code>rel="successor-version"</code> from the old one and <code>rel="predecessor-version"</code> from the new one.</li>
+  </ul>
+
+  <h3 id="language">5.6 Language of the API’s texts</h3>
+  <p>Errors, the discovery document and the schemas the API serves <span class="must">MAY</span> depend on <code>Accept-Language</code> (<a class="src" href="https://www.rfc-editor.org/rfc/rfc9110#section-12.5.4"><strong>RFC 9110</strong></a>, section 12.5.4). Only their texts for people change: in an error, <code>title</code> and <code>detail</code>, also those of each <code>errors</code> entry; in discovery, <code>description</code>; in a schema, also one embedded in <code>schemas</code>, the JSON Schema <code>title</code> and <code>description</code> annotations. Data never does (<a href="#data">3</a>).</p>
+  <ul>
+    <li>The server picks the language with the <em>lookup</em> of <a class="src" href="https://www.rfc-editor.org/rfc/rfc4647#section-3.4"><strong>RFC 4647</strong></a> (section 3.4) over the languages it can give that response in, trying the ranges of <code>Accept-Language</code> from highest to lowest weight and, at equal weight, in header order; case-insensitively, without canonicalizing ranges or tags (<code>iw</code> does not find <code>he</code>), and without first dropping extensions or private-use subtags. It ignores <code>*</code>, ranges with <code>q=0</code> and malformed ranges (a malformed <code>q</code> included). If none matches, or the header is missing, it <span class="must">MUST</span> use its default language. It <span class="must">MUST NOT</span> answer <code>406</code> or <code>400</code> because of <code>Accept-Language</code>.</li>
+    <li>Every response whose texts are picked this way (an error, the discovery document or a schema), in the default language too, <span class="must">MUST</span> carry <code>Vary: Accept-Language</code>, and a <code>304</code> of these the same <code>Vary</code> as its <code>200</code>. A response with a body <span class="must">SHOULD</span> carry <code>Content-Language</code>. Each language is a different representation: an <code>ETag</code>, if present, <span class="must">MUST</span> differ by language.</li>
+    <li>Lookup truncates the requested tag and never tries sibling variants: with <code>es-es</code> and <code>es-mx</code> but no <code>es</code>, <code>Accept-Language: es-AR</code> gets the default language. A server that offers regional variants of its texts <span class="must">SHOULD</span> also offer the bare language.</li>
+    <li>A replay (<a href="#idempotency">7.1</a>) returns the stored response, in its language, because <code>Accept-Language</code> does not count towards “the same request”.</li>
+  </ul>
+
+  <h3 id="inheritance">5.7 Inherited values</h3>
+  <p>A value can apply to an item without being stored in it: a product’s tax rate is its own if it has one; otherwise its category’s, its parent category’s or its store’s; and if none has one, a default. Restep expresses this with <strong>two fields</strong> and a declaration in discovery. No API has to use it; the rules of this section apply only to the fields that <code>inherit</code> declares.</p>
+  <ul>
+    <li>The <strong>effective field</strong> (<code>tax_rate</code>) gives the value that applies, already resolved. It is read-only.</li>
+    <li>The <strong>own field</strong> (<code>tax_rate_own</code>) gives the item’s own value, or <code>null</code> if it has none and inherits. It is the one that is written.</li>
+  </ul>
+  <p>There are two because a single field would have to show the value that applies and also store the one that is written. A client that sends back what it read (<a href="#resources">5.1</a>) would then turn every inherited value into an own value: the value does not change, but the item stops following its source and nobody notices. With two fields, writing the value you see and deciding whether it is inherited are different operations on different fields.</p>
+<pre tabindex="0"><code><span class="k">GET</span> /products/7
+<span class="c">→ 200</span>
+<span class="h">ETag:</span> "p7-v3"
+{ <span class="s">"id"</span>: <span class="s">"7"</span>, <span class="s">"name"</span>: <span class="s">"Zucchini"</span>, <span class="s">"category"</span>: { <span class="s">"id"</span>: <span class="s">"4"</span> },
+  <span class="s">"tax_rate"</span>: <span class="s">"10"</span>,
+  <span class="s">"tax_rate_own"</span>: null,
+  <span class="s">"_inherited"</span>: { <span class="s">"tax_rate"</span>: { <span class="s">"from"</span>: { <span class="s">"href"</span>: <span class="s">"/categories/2"</span> } } } }</code></pre>
+  <p><strong>Declaration.</strong> In the collection object, the keys of <code>inherit</code> are the effective fields:</p>
+<pre tabindex="0"><code><span class="s">"products"</span>: {
+  <span class="s">"relations"</span>: { <span class="s">"category"</span>: { <span class="s">"to"</span>: <span class="s">"categories"</span> } },
+  <span class="s">"inherit"</span>: {
+    <span class="s">"tax_rate"</span>: { <span class="s">"own"</span>: <span class="s">"tax_rate_own"</span>, <span class="s">"from"</span>: [<span class="s">"category"</span>], <span class="s">"default"</span>: true,
+                  <span class="s">"description"</span>: <span class="s">"The product’s tax rate; without its own, its category’s."</span> } } },
+<span class="s">"categories"</span>: {
+  <span class="s">"relations"</span>: { <span class="s">"parent"</span>: { <span class="s">"to"</span>: <span class="s">"categories"</span> }, <span class="s">"store"</span>: { <span class="s">"to"</span>: <span class="s">"stores"</span> } },
+  <span class="s">"inherit"</span>: { <span class="s">"tax_rate"</span>: { <span class="s">"own"</span>: <span class="s">"tax_rate_own"</span>, <span class="s">"from"</span>: [<span class="s">"parent"</span>, <span class="s">"store"</span>], <span class="s">"default"</span>: true } } }</code></pre>
+  <ul>
+    <li><code>own</code> names the own field. Both fields <span class="must">MUST</span> be top-level and of one of the scalar types of <a href="#discovery">4.2</a>, and cannot be <code>id</code>, a relationship or a language map: in those, <code>null</code> or the merge patch already mean something else (<a href="#data">3</a>, <a href="#resources">5.1</a>).</li>
+    <li><code>from</code> lists, in order, the relationships <strong>this step</strong> inherits from. Each <span class="must">MUST</span> be to-one and declared in <code>relations</code> (<a href="#relations">8</a>), even if the server does not announce that profile, and its target collection <span class="must">MUST</span> have a field with the same name as the effective one. If that field is also declared in its <code>inherit</code>, the chain continues: so a category inherits from its parent category to whatever depth is needed, without dotted paths.</li>
+    <li><code>"default": true</code> says there is a default at the end of the chain and the effective value is never empty. The value is not published: changing it is a change of data, not of discovery.</li>
+    <li><code>description</code> explains the field as in <a href="#describing">4.3</a>.</li>
+  </ul>
+  <p><strong>Resolution.</strong> The effective value <span class="must">MUST</span> be the own value, if it is not <code>null</code>; otherwise the effective value of the item linked by the first relationship in <code>from</code> that has a link; otherwise the default; and with no default, the field has no value (<a href="#data">3</a>). A link that would create a cycle (a category that ends up as its own ancestor) <span class="must">MUST</span> give <code>422 invalid</code>.</p>
+  <p><strong>Reading.</strong></p>
+  <ul>
+    <li>When the representation carries the effective field, it <span class="must">MUST</span> carry it resolved and with its usual type. The own field carries its value or <code>null</code>.</li>
+    <li>The item <span class="must">MAY</span> explain the origin in <code>_inherited</code>: an object whose keys are the effective fields present in the representation that do not come from the own field. If it carries it, it <span class="must">MUST</span> name them all, so an effective field not in <code>_inherited</code> has its own value. With <code>fields</code> (<a href="#fields">6.3</a>), <code>_inherited</code> only covers the fields in the response. Each value is one of these:
+      <ul>
+        <li><code>{"from": {"href": "/categories/2"}}</code>: the absolute path (<a href="#data">3</a>) of the value’s <strong>actual source</strong>, not of the immediate parent. In the example, category 4 has no own value and category 2 does.</li>
+        <li><code>{"from": "default"}</code>: it comes from the default.</li>
+        <li><code>{"from": "hidden"}</code>: it is inherited, but the client cannot see the source. The server <span class="must">MUST NOT</span> give the path of an item the client cannot see, just as a relationship is left with only <code>id</code> (<a href="#relations">8</a>), nor of one whose existence it does not reveal (<a href="#errors">5.4</a>).</li>
+      </ul>
+    </li>
+  </ul>
+  <p><strong>Writing.</strong> The own field is an ordinary field and follows the merge patch with no exceptions. It is the only one that changes inheritance:</p>
+  <div class="tbl" tabindex="0"><table>
+    <thead><tr><th><code>PATCH</code> body</th><th>Effect</th></tr></thead>
+    <tbody>
+      <tr><td><code>{"tax_rate_own": "4"}</code></td><td>It gets its own value, 4</td></tr>
+      <tr><td><code>{"tax_rate_own": "10"}</code>, equal to the inherited one</td><td>It gets its own value, 10: the same value, but it no longer follows the category</td></tr>
+      <tr><td><code>{"tax_rate_own": null}</code></td><td>Deletes the own value and inherits again</td></tr>
+      <tr><td>No <code>tax_rate_own</code></td><td>Nothing changes</td></tr>
+    </tbody>
+  </table></div>
+  <p>The effective field is read-only (<a href="#resources">5.1</a>), so writing it never changes anything: a <code>PATCH</code> with its current value is ignored, and another value gives <code>422 invalid</code> with a <code>read_only</code> entry, whose <code>detail</code> <span class="must">SHOULD</span> name the own field. It is compared rather than always ignored so that a client trying to change it learns that nothing changed, instead of getting a misleading <code>200</code>.</p>
+  <ul>
+    <li>In a <code>POST</code>, an absent or <code>null</code> own field makes the item start out inheriting, and the effective field follows the same rule, compared with the value that would result.</li>
+  </ul>
+<pre tabindex="0"><code><span class="k">PATCH</span> /products/7
+{ <span class="s">"tax_rate"</span>: <span class="s">"4"</span> }
+<span class="c">→ 422 application/problem+json</span>
+{ <span class="s">"type"</span>: <span class="s">"https://restep.wubytes.com/1/errors#invalid"</span>, <span class="s">"title"</span>: <span class="s">"Invalid data"</span>, <span class="s">"status"</span>: 422, <span class="s">"code"</span>: <span class="s">"invalid"</span>,
+  <span class="s">"errors"</span>: [ { <span class="s">"pointer"</span>: <span class="s">"/tax_rate"</span>, <span class="s">"code"</span>: <span class="s">"read_only"</span>,
+                <span class="s">"detail"</span>: <span class="s">"“tax_rate” is the effective value; write “tax_rate_own”."</span> } ] }</code></pre>
+  <p><strong>Sending back the effective fields as read changes nothing.</strong> This is the rule of <a href="#resources">5.1</a> applied to inheritance: a <code>PATCH</code> with the effective fields as read leaves the item as it was: they match and are ignored, the own fields it leaves out are not touched, and <code>_inherited</code> is ignored like any <code>_</code> member. A client that does not know the own field exists can leave it out safely, and the only mistake it can make is writing the effective field, which gives the <code>422</code> above and tells it where to write. This works because in a <code>PATCH</code> what is absent is not touched: with a <code>PUT</code>, which Restep leaves out (<a href="#resources">5.1</a>), leaving out the own field would delete it and the item would inherit again without anyone asking.</p>
+<pre tabindex="0"><code><span class="k">PATCH</span> /products/7                <span class="c">the effective field as read, without the own field</span>
+{ <span class="s">"id"</span>: <span class="s">"7"</span>, <span class="s">"tax_rate"</span>: <span class="s">"10"</span> }
+<span class="c">→ 200, the item unchanged and the same ETag</span></code></pre>
+  <p><strong>Stale reads.</strong> If the source changes between the read and the write (category 2 moves to 5 %), the <code>"tax_rate": "10"</code> the client sends back no longer matches. With <code>If-Match</code> it gives <code>412</code>, because the product’s <code>ETag</code> has already changed (<a href="#concurrency">7.2</a>); without it, <code>422</code> with <code>read_only</code>. Either way it fails without changing anything, where a stale ordinary field would silently overwrite someone else’s change.</p>
+  <p><strong>When a source changes.</strong> When a category’s value changes, the effective value of every item that inherits from it changes, though nobody touched them. For the client those items have changed, so what other sections already say applies to each:</p>
+  <ul>
+    <li>its <code>ETag</code> changes (<a href="#concurrency">7.2</a>: it is that of the complete representation), also when only <code>_inherited</code> changes, for instance if category 4 sets as its own the same value it inherited;</li>
+    <li>with <code>sync</code>, its collection’s <code>state</code> changes and <code>:changes</code> lists them (<a href="#sync">9</a>);</li>
+    <li>with a shared cache, the write to the source <span class="must">SHOULD</span> also invalidate the groups of those items and of the collections that can contain them (<a href="#caching">7.3</a>).</li>
+  </ul>
+  <p>This forces the server to store the effective values or to propagate each change to every descendant. It is the main cost of declaring <code>inherit</code>.</p>
+  <p><strong>Filters and sorting.</strong> With <code>query</code>, filtering and sorting by the effective field compare the value the client sees: <code>filter[tax_rate][eq]=10</code> gives those worth 10, inherited or not. Those that inherit are asked for with <code>filter[tax_rate_own][null]=true</code>, with no new operators, if that filter is declared (<a href="#filters">6.1</a>).</p>
+  <p><strong>Evolution.</strong> Adding inheritance to a new value, or to a field that was already read-only, is compatible: the own field and the declaration are added. Turning into an effective field one that could be written until now is not, because it would reject writes that used to be accepted (<a href="#versions">5.5</a>): it takes a major version, or retiring the field and adding the pair under other names.</p>
+</section>
+
+<section aria-labelledby="query">
+  <h2 id="query">6. query <span class="badge">Profile</span></h2>
+  <p>Profile URI: <code>https://restep.wubytes.com/1/query</code>. It applies to collections; <code>fields</code> also applies to items. None of its parameters needs a parser: any HTTP framework reads them.</p>
+  <h3 id="filters">6.1 Filters</h3>
+<pre tabindex="0"><code><span class="k">GET</span> /books?filter[category]=novela-negra&amp;filter[price][le]=20</code></pre>
+  <ul>
+    <li>The discovery document <span class="must">MUST</span> declare in <code>filter</code> which fields can be filtered, with their type and operators. Fields of a relationship use a dotted path (<code>author.id</code>).</li>
+    <li><code>filter[field]=value</code> is the same filter as <code>filter[field][eq]=value</code>. Filters on the same field with different operators are different filters (<code>filter[price][ge]=10&amp;filter[price][le]=20</code>). Several filters <span class="must">MUST</span> be combined with AND; for OR, NOT and parentheses there is the <a href="#filter-expr"><code>filter-expr</code></a> extension.</li>
+    <li>Operators: <code>eq</code>, <code>ne</code>, <code>lt</code>, <code>le</code>, <code>gt</code>, <code>ge</code>, <code>in</code> and <code>null</code>.</li>
+    <li><code>in</code> takes values separated by commas; its values cannot contain commas (use <code>eq</code>, <code>filter-expr</code> or <code>query-method</code> for those). <code>null</code> takes <code>true</code> (no value: absent or <code>null</code>) or <code>false</code>.</li>
+    <li>The server <span class="must">MUST</span> compare by the declared type: numerically for <code>integer</code>, <code>number</code> and <code>decimal</code> (decimals exactly, without going through floating point), chronologically for <code>date</code> and <code>datetime</code> (as instants), by length for <code>duration</code> (a day counts as 24 hours; a filter value with years or months <span class="must">MUST</span> give <code>invalid_parameter</code>, because they have no fixed length), and by Unicode code points for <code>string</code> and <code>enum</code>, case-sensitively and without language rules. A <code>boolean</code> field may declare only <code>eq</code>, <code>ne</code> and <code>null</code>. <code>null</code> may be declared on a field of any type and tests whether the value is absent or <code>null</code>.</li>
+    <li>A translation is filtered as <code>field.tag</code>, with a language map of the collection and a lowercase key: <code>filter[name.es-mx]=Calabacita</code>. Discovery declares each one on its own, of type <code>string</code>: <code>"name.es-mx": {"type": "string", "ops": ["eq", "in"]}</code>. It reads only that exact key, with no <a class="src" href="https://www.rfc-editor.org/rfc/rfc4647"><strong>RFC 4647</strong></a> matching and no fallback: if the item lacks the key, the field is absent. The language map itself and any other path that ends in or goes through one (<code>author.name</code>, <code>author.name.es</code>) <span class="must">MUST NOT</span> be declared in <code>filter</code> or <code>sort</code>, and a language map <span class="must">MUST NOT</span> share its name with a relationship of its collection, so <code>name.es-mx</code> is never a relationship path.</li>
+    <li>Every operator except <code>null</code> <span class="must">MUST NOT</span> match items where the field is absent or <code>null</code>.</li>
+    <li>A <code>null</code> operand other than <code>true</code> or <code>false</code>, an operand of any other operator that does not match the field’s type (for <code>in</code>, each element), an empty <code>in</code> list, or the same filter (same field and operator, in either form) twice <span class="must">MUST</span> give <code>invalid_parameter</code>. An undeclared field or operator, <code>unsupported_parameter</code> (<a href="#reserved">5.3</a>).</li>
+  </ul>
+  <h3 id="sorting">6.2 Sorting</h3>
+  <p><code>sort=-rating,title</code>: comma-separated fields, with a leading <code>-</code> for descending order. Sortable fields are declared in <code>sort</code>; any other <span class="must">MUST</span> give <code>unsupported_parameter</code>. The server <span class="must">MUST</span> break ties in a stable way (for instance, by <code>id</code>). Items without a value for a sort key <span class="must">MUST</span> go last, in both directions. A translation is sorted as its declared <code>field.tag</code> (<a href="#filters">6.1</a>): <code>sort=name.es-mx</code>; strings sort by code points, without language rules.</p>
+  <h3 id="fields">6.3 Fields</h3>
+  <p>With <code>fields=title,price</code> the response <span class="must">MUST</span> carry only those fields, plus <code>id</code> and members starting with <code>_</code>. It also works on a single item’s <code>GET</code>, where, with <code>writes</code>, the item also carries <code>_etag</code> (<a href="#concurrency">7.2</a>). A field that does not exist <span class="must">MUST</span> give <code>invalid_parameter</code>. A language map is one field: <code>fields=name</code> returns it whole, and a path into it (<code>name.es</code>; with <a href="#relations"><code>relations</code></a>, also <code>author.name.es</code>) <span class="must">MUST</span> give <code>invalid_parameter</code>.</p>
+  <h3 id="pagination">6.4 Pagination</h3>
+  <ul>
+    <li><code>limit</code> sets the page size, between 1 and the declared <code>max_limit</code>. Outside that range the server <span class="must">MUST</span> give <code>invalid_parameter</code>, not clamp it silently.</li>
+    <li><code>next</code> <span class="must">MUST</span> carry an opaque <code>cursor</code> parameter and keep the other parameters unchanged. Clients <span class="must">MUST NOT</span> interpret or build cursors.</li>
+    <li>A cursor is bound to the collection, the filters and the sort it was issued for; with <code>QUERY</code>, to the <code>filter</code> and <code>sort</code> members of the body (<a href="#query-method">10.4</a>). A cursor the server did not issue (a tampered one), an expired one, or one used with another collection, other filters or another sort <span class="must">MUST</span> give <code>invalid_parameter</code> with <code>parameter: "cursor"</code>. A cursor <span class="must">SHOULD</span> also be bound to the principal (<a href="#terms">2</a>) that received it. Signing it is the simplest way to tell a tampered one.</li>
+    <li>A cursor <span class="must">MUST NOT</span> be bound to <code>limit</code>, <code>fields</code>, <code>include</code> or <code>count</code>: they change what each page carries, not which items the traversal visits. Between pages, a client <span class="must">MAY</span> add, change or remove them in the <code>next</code> URL of a <code>GET</code>, or in the body of a <code>QUERY</code>, and that <span class="must">MUST NOT</span> invalidate the cursor.</li>
+    <li>A server <span class="must">MAY</span> start with an offset inside the cursor and later move to keyset pagination without clients noticing. The guarantee is the one in <a href="#collections">5.2</a>: no repeats and no gaps without concurrent writes.</li>
+  </ul>
+  <h3 id="counts">6.5 Counts</h3>
+  <p>Discovery declares <code>count</code> as <code>"exact"</code> or <code>"estimated"</code>. With <code>count=true</code>, the response <span class="must">MUST</span> add <code>total</code> and, if the number is approximate, <code>"total_estimated": true</code>. <code>count=false</code> is the same as leaving it out. On a collection that does not declare <code>count</code>, <code>count=true</code> <span class="must">MUST</span> give <code>unsupported_parameter</code>.</p>
+</section>
+
+<section aria-labelledby="writes">
+  <h2 id="writes">7. writes <span class="badge">Profile</span></h2>
+  <p>Profile URI: <code>https://restep.wubytes.com/1/writes</code>. Writes that can be retried safely, and reads that can be cached.</p>
+  <h3 id="idempotency">7.1 Retry without duplicating</h3>
+<pre tabindex="0"><code><span class="k">POST</span> /orders
+<span class="h">Idempotency-Key:</span> "8e03978e-40d5-43e8-bc93-6894a57f9324"</code></pre>
+  <ul>
+    <li>Every non-idempotent <code>POST</code>, including actions declared <code>"idempotent": false</code>, <span class="must">MUST</span> accept the <code>Idempotency-Key</code> header: a Structured Fields string (<a class="src" href="https://www.rfc-editor.org/rfc/rfc9651"><strong>RFC 9651</strong></a>), as in the IETF draft. A malformed key <span class="must">MUST</span> give <code>400 bad_request</code>.</li>
+    <li>A key belongs to one principal (<a href="#terms">2</a>), not to a token, and one target (method and path): a retry with a renewed token still finds it. Two requests are <strong>the same</strong> when they share key, principal and target and their bodies are equal as JSON values (member order and whitespace do not count).</li>
+    <li>The server <span class="must">MUST</span> keep each key for at least 24 hours from the first request, and <span class="must">SHOULD</span> declare how long in discovery (<code>"idempotency": {"ttl": 86400}</code>, in seconds). After that, the key counts as new.</li>
+    <li>If the same request arrives again, the server <span class="must">MUST</span> return the same status and body without repeating the effect, and <span class="must">SHOULD</span> add <code>Idempotent-Replayed: true</code>. Headers such as <code>Date</code> may differ. A replay, and the <code>409 conflict</code> for the same request while the first one is still running, are decided after every check that <a href="#errors">5.4</a> puts before <code>428</code>. Neither evaluates <code>If-Match</code>, <code>If-None-Match</code> or a <code>428</code> requirement: a replay returns the stored response even if they no longer hold. A different request under the same key evaluates them as usual, so <code>412</code> comes before <code>422 idempotency_mismatch</code>.</li>
+    <li>If the server fails after the effect and before storing the response, a retry with the same key <span class="must">MUST NOT</span> repeat the effect: the server records both atomically, or recovers as if it had.</li>
+    <li>A request that was rejected before it ran (a <code>4xx</code> such as <code>422</code>, or a <code>5xx</code> that left no effect) <span class="must">MAY</span> be left unstored; then it does not use up the key, and the client can fix it and retry with the same one. A request that had an effect <span class="must">MUST</span> be stored.</li>
+    <li>The same key with a different request <span class="must">MUST</span> give <code>422 idempotency_mismatch</code>, also while the first one is still running; the same request while the first one is still running gives <code>409 conflict</code>. A resource that requires the key <span class="must">MUST</span> give <code>400 idempotency_key_required</code> without it.</li>
+    <li>A <code>core</code>-only server does not know the header and ignores it. Clients <span class="must">MUST NOT</span> rely on <code>Idempotency-Key</code> unless the server announces <code>writes</code>.</li>
+  </ul>
+  <h3 id="concurrency">7.2 Optimistic concurrency</h3>
+  <ul>
+    <li>Each item has a strong <strong>item ETag</strong>: the <code>ETag</code> of its full representation, without <code>fields</code> or <code>include</code>. A <code>GET</code> of the full item without content coding <span class="must">MUST</span> carry it, and servers <span class="must">MUST NOT</span> use a weak validator (<code>W/</code>) for it. With a content coding (gzip), the <code>ETag</code> header <span class="must">MAY</span> differ, as <a class="src" href="https://www.rfc-editor.org/rfc/rfc9110"><strong>RFC 9110</strong></a> requires, and the item then <span class="must">MUST</span> carry the item ETag in <code>_etag</code>.</li>
+    <li>A single item’s response with <code>fields</code> or <code>include</code> is another representation: its <code>ETag</code> header <span class="must">MUST</span> change whenever anything in it changes, included items too, and the item <span class="must">MUST</span> carry the item ETag in <code>_etag</code>, so the client can write without another read.</li>
+    <li>Items inside a collection <span class="must">MAY</span> carry that same value in <code>_etag</code>, so a client can write without reading each item first.</li>
+    <li><code>PATCH</code> and <code>DELETE</code> <span class="must">MUST</span> evaluate <code>If-Match</code> against the item ETag as <a class="src" href="https://www.rfc-editor.org/rfc/rfc9110"><strong>RFC 9110</strong></a> says (lists, <code>*</code>, strong comparison): if it does not match, <code>412 precondition_failed</code>.</li>
+    <li>Evaluating <code>If-Match</code> and applying the write <span class="must">MUST</span> be atomic with respect to other writes to the same item.</li>
+    <li>A resource <span class="must">MAY</span> require <code>If-Match</code>; without it, it <span class="must">MUST</span> answer <code>428 precondition_required</code>. Starting to require it is a breaking change (<a href="#versions">5.5</a>).</li>
+  </ul>
+  <h3 id="caching">7.3 Caching</h3>
+  <ul>
+    <li>Every response to a <code>GET</code> or <code>HEAD</code>, errors included, <span class="must">MUST</span> carry an explicit <code>Cache-Control</code>.</li>
+    <li>A response that depends on credentials <span class="must">MUST</span> be <code>private</code> or <code>no-store</code>.</li>
+    <li><code>If-None-Match</code> <span class="must">MUST</span> be evaluated as <a class="src" href="https://www.rfc-editor.org/rfc/rfc9110"><strong>RFC 9110</strong></a> says (lists, <code>*</code>, weak comparison): when it matches, the server <span class="must">MUST</span> answer <code>304</code> to <code>GET</code>, <code>HEAD</code> and <code>QUERY</code>, and <code>412</code> to writes without applying them. <code>304</code> to <code>QUERY</code> is a Restep rule: <a class="src" href="https://www.rfc-editor.org/rfc/rfc9110#section-13.1.2"><strong>RFC 9110</strong></a> (section 13.1.2) names only <code>GET</code> and <code>HEAD</code>, while <a class="src" href="https://www.rfc-editor.org/rfc/rfc10008"><strong>RFC 10008</strong></a> makes a <code>QUERY</code> select the same representation as the equivalent <code>GET</code> and answers a conditional one with <code>304</code> in its example.</li>
+    <li>A successful response to a <code>GET</code> <span class="must">SHOULD</span> carry <code>Cache-Groups</code> (<a class="src" href="https://www.rfc-editor.org/rfc/rfc9875"><strong>RFC 9875</strong></a>) naming every item it represents, included ones too, and, for a collection, the collection itself, so a cache can drop the lists an item enters or leaves. A <code>2xx</code> response to a <code>HEAD</code> <span class="must">SHOULD</span> carry the groups the <code>GET</code> would. A successful response to a write that committed changes (for a batch, the outer response, covering every committed operation) <span class="must">SHOULD</span> carry <code>Cache-Group-Invalidation</code> naming every item it changed and their collections, even without a body. Group names are opaque and per origin; the item’s path (<code>"/books/7"</code>) and the collection’s (<code>"/books"</code>) are the obvious choice. A cache may or may not honour them, and <a class="src" href="https://www.rfc-editor.org/rfc/rfc9875"><strong>RFC 9875</strong></a> only guarantees 32 groups per field, of 32 characters each, so a long page or a long id may not get every item invalidated. The collection’s own group <span class="must">SHOULD</span> come first.</li>
+  </ul>
+  <h3 id="minimal">7.4 Minimal responses</h3>
+  <p>With <code>Prefer: return=minimal</code> (<a class="src" href="https://www.rfc-editor.org/rfc/rfc7240"><strong>RFC 7240</strong></a>), writes <span class="must">MAY</span> respond without a body: <code>201</code> with <code>Location</code> and <code>ETag</code>, or <code>204</code>, with <code>ETag</code> when the item still exists (not after a <code>DELETE</code>). When they do, they <span class="must">SHOULD</span> carry <code>Preference-Applied: return=minimal</code>. By default they return the representation.</p>
+</section>
+
+<section aria-labelledby="relations">
+  <h2 id="relations">8. relations <span class="badge">Profile</span></h2>
+  <p>Profile URI: <code>https://restep.wubytes.com/1/relations</code>. The shape of relationships is set in <a href="#data">section 3</a>, and how they are written in <a href="#resources">5.1</a>, so any server follows them; this profile adds declarations and expansion.</p>
+  <ul>
+    <li>Discovery <span class="must">MUST</span> declare each relationship in <code>relations</code>, with its target collection in <code>to</code> (a list, when it can point to several: see <a href="#data">section 3</a>), <code>"many": true</code> if it is to-many, and <code>"include": true</code> if it can be expanded.</li>
+    <li><code>include=author</code> <span class="must">MUST</span> fill that object with the full item. Dotted paths (<code>include=author.publisher</code>) are allowed up to the declared <code>include_depth</code> (1 if not declared). A relationship that is not declared or not expandable, or a path deeper than <code>include_depth</code>, <span class="must">MUST</span> give <code>unsupported_parameter</code>.</li>
+    <li>If the client cannot see the related item, the object <span class="must">MUST</span> stay with only <code>id</code> (and <code>type</code>).</li>
+    <li>When the server also implements <code>query</code>, <code>fields</code> accepts dotted paths (<code>fields=title,author.name</code>); a dotted path whose relationship is not in <code>include</code> <span class="must">MUST</span> give <code>invalid_parameter</code>.</li>
+    <li>Relationships with many items (a book’s reviews) <span class="must">SHOULD</span> be <strong>subcollections</strong>, such as <code>/books/7/reviews</code>, declared with a <code>path</code> template and following <code>core</code> and, if announced, <code>query</code>. A to-many list embedded in a representation <span class="must">MUST NOT</span> be paginated: if it can grow without bound, it <span class="must">SHOULD</span> be a subcollection.</li>
+    <li>To filter by a relationship, discovery declares the dotted path in <code>filter</code>: <code>filter[author.id]=3</code>.</li>
+  </ul>
+<pre tabindex="0"><code><span class="k">GET</span> /books/7
+{ <span class="s">"id"</span>: <span class="s">"7"</span>, <span class="s">"title"</span>: <span class="s">"La niebla de Portugalete"</span>, <span class="s">"author"</span>: { <span class="s">"id"</span>: <span class="s">"3"</span> } }
+
+<span class="k">GET</span> /books/7?include=author&amp;fields=title,author.name
+{ <span class="s">"id"</span>: <span class="s">"7"</span>, <span class="s">"title"</span>: <span class="s">"La niebla de Portugalete"</span>, <span class="s">"author"</span>: { <span class="s">"id"</span>: <span class="s">"3"</span>, <span class="s">"name"</span>: <span class="s">"Inés Arriaga"</span> } }
+
+<span class="k">PATCH</span> /books/7                <span class="c">changes the link, not the author</span>
+{ <span class="s">"author"</span>: { <span class="s">"id"</span>: <span class="s">"4"</span> } }</code></pre>
+</section>
+
+<section aria-labelledby="sync">
+  <h2 id="sync">9. sync <span class="badge">Profile</span></h2>
+  <p>Profile URI: <code>https://restep.wubytes.com/1/sync</code>. Keep a local copy of whole collections up to date without downloading everything again. It requires <code>query</code>: every synced collection <span class="must">MUST</span> declare <code>id</code> in <code>filter</code> with <code>in</code>.</p>
+  <ul>
+    <li>Collection responses <span class="must">MUST</span> carry <code>state</code>: an opaque string that changes whenever anything the client can see in the collection changes. It reflects that client’s view: an item it stops being allowed to see counts as destroyed.</li>
+    <li>Every page of a traversal <span class="must">MUST</span> carry the <code>state</code> of its first page, the request without <code>cursor</code> (the server can keep it in the cursor). A client <span class="must">MUST</span> use it as <code>since</code> for its next sync: changes made during the traversal show up there.</li>
+    <li>A traversal <span class="must">MUST NOT</span> miss items: every item that existed when the first page was served, and does not appear in <code>:changes</code> since that <code>state</code>, appears in some page. Offset cursors do not guarantee this; keyset cursors or a snapshot do.</li>
+    <li><code>GET /books:changes?since=&lt;state&gt;</code> returns the identifiers created, updated and destroyed since that state. The response <span class="must">MUST</span> carry <code>since</code>, <code>state</code>, <code>has_more</code>, <code>created</code>, <code>updated</code> and <code>destroyed</code>. Each identifier <span class="must">MUST</span> appear in at most one list, picked by what the client could see between <code>since</code> and the returned <code>state</code> (an item that does not exist cannot be seen). These rules cover the items that changed, or whose visibility to the client changed, in that window:
+      <ul>
+        <li>an item it could see at <code>since</code> and cannot see at <code>state</code> <span class="must">MUST</span> be in <code>destroyed</code>;</li>
+        <li>an item it can see at <code>state</code> <span class="must">MUST</span> be in <code>updated</code> if it could see it at <code>since</code> and it changed or stopped being visible in between, and in <code>created</code> if it could not see it at <code>since</code>;</li>
+        <li>an item it cannot see at either end <span class="must">MUST</span> be in <code>destroyed</code> if it could see it in between, and <span class="must">MUST NOT</span> appear otherwise.</li>
+      </ul>
+      An item it could see at both ends that did not change <span class="must">MAY</span> be in <code>updated</code>. If the server cannot reconstruct what the client could see in the window, it <span class="must">MUST</span> answer <code>410 state_expired</code>; whether it can <span class="must">MUST NOT</span> depend on the existence of an item concealed from the client (<a href="#errors">5.4</a>). Clients treat <code>created</code> and <code>updated</code> alike, fetching the item and replacing their copy, and ignore an <code>id</code> in <code>destroyed</code> that they do not have.</li>
+    <li>If <code>has_more</code> is <code>true</code>, the returned <code>state</code> is intermediate: the client <span class="must">MUST</span> call again with it until <code>has_more</code> is <code>false</code> before treating its copy as current.</li>
+    <li><code>:changes</code> covers the whole collection: filters and the other <code>query</code> parameters <span class="must">MUST</span> give <code>unsupported_parameter</code> there, and a missing <code>since</code> <span class="must">MUST</span> give <code>invalid_parameter</code>. Keeping a filtered view in sync is outside this version.</li>
+    <li>The client fetches the changed items with <code>GET /books?filter[id][in]=7,12</code>.</li>
+    <li>The server <span class="must">SHOULD</span> keep changes for at least 7 days and <span class="must">SHOULD</span> declare how long in the collection’s <code>sync.retention</code> (seconds). If it can no longer compute the changes, it <span class="must">MUST</span> answer <code>410 state_expired</code>, and the client reloads the collection.</li>
+    <li>The action name <code>changes</code> is reserved for this profile.</li>
+    <li>The server <span class="must">MAY</span> offer notifications over Server-Sent Events at the path declared in <code>events</code>; that response <span class="must">MUST</span> carry <code>Cache-Control: no-store</code>. Each event says which collections have a new state; the data itself is fetched with <code>:changes</code>.</li>
+    <li>Events are hints: clients <span class="must">MUST</span> tolerate repeated, merged and reordered events. On opening the stream, and on every reconnection, a client <span class="must">MUST</span> call <code>:changes</code> for each collection it keeps, from the last state it applied, and <span class="must">MUST</span> advance that state only after applying the changes; an event alone never advances it. Servers <span class="must">MUST NOT</span> rely on <code>Last-Event-ID</code> to resume.</li>
+    <li>The server <span class="must">SHOULD</span> send an SSE comment at least every 30 seconds, to reduce idle timeouts. It <span class="must">MUST</span> close the stream when the credentials that opened it stop being valid, and <span class="must">MUST</span> answer <code>401</code> to any reconnection that carries invalid credentials, an automatic <code>EventSource</code> one included. After that, the application <span class="must">MUST</span> wait for valid credentials before opening the stream again.</li>
+  </ul>
+<pre tabindex="0"><code><span class="k">GET</span> /books:changes?since=s128
+{ <span class="s">"since"</span>: <span class="s">"s128"</span>, <span class="s">"state"</span>: <span class="s">"s131"</span>, <span class="s">"has_more"</span>: false,
+  <span class="s">"created"</span>: [<span class="s">"51"</span>], <span class="s">"updated"</span>: [<span class="s">"7"</span>, <span class="s">"12"</span>], <span class="s">"destroyed"</span>: [<span class="s">"34"</span>] }
+
+<span class="k">GET</span> /events            <span class="c">Accept: text/event-stream</span>
+event: state
+data: {"books": "s131"}</code></pre>
+</section>
+
+<section aria-labelledby="extensions">
+  <h2 id="extensions">10. Extensions</h2>
+  <p>Each extension is announced in <code>extensions</code> and in the <code>Link</code> header, and has its own profile URI (<code>https://restep.wubytes.com/1/batch</code>…). What each one requires is in <a href="#dependencies">1.2</a>.</p>
+
+  <h3 id="actions">10.1 actions <span class="badge x">Extension</span></h3>
+  <p>Operations that are not create, read, update or delete, following <a class="src" href="https://google.aip.dev/136"><strong>AIP-136</strong></a>: the action name goes after a colon.</p>
+<pre tabindex="0"><code><span class="k">POST</span> /orders/2001:cancel       <span class="c">on an item</span>
+<span class="k">POST</span> /books:import             <span class="c">on the collection</span>
+<span class="k">GET</span>  /orders/2001:preview      <span class="c">a safe action declared with "method": "GET"</span></code></pre>
+  <ul>
+    <li>Each action <span class="must">MUST</span> be declared in its collection’s <code>actions</code>, with <code>on</code> (<code>"item"</code> or <code>"collection"</code>), <code>safe</code> and <code>idempotent</code>. Action names are <code>snake_case</code>; <code>changes</code> is reserved for <code>sync</code>.</li>
+    <li>An action uses <code>POST</code> unless its declaration says <code>"method": "GET"</code>, which only safe actions <span class="must">MAY</span> do. Servers <span class="must">MUST</span> also accept the colon encoded as <code>%3A</code>.</li>
+    <li>The declaration <span class="must">MAY</span> carry a <code>description</code> and, if the action uses <code>POST</code>, an <code>input</code> schema (<a href="#describing">4.3</a>). A <code>GET</code> action has no body, so it <span class="must">MUST NOT</span> declare <code>input</code>.</li>
+    <li>The response <span class="must">MUST</span> be the affected resource’s representation (<code>200</code>), a new one (<code>201</code> with <code>Location</code>) or nothing (<code>204</code>).</li>
+    <li>A representation <span class="must">MAY</span> list in <code>_actions</code> the actions available in its current state, so clients do not duplicate business rules:</li>
+  </ul>
+<pre tabindex="0"><code>{ <span class="s">"id"</span>: <span class="s">"2001"</span>, <span class="s">"status"</span>: <span class="s">"paid"</span>,
+  <span class="s">"_actions"</span>: { <span class="s">"cancel"</span>: { <span class="s">"method"</span>: <span class="s">"POST"</span>, <span class="s">"href"</span>: <span class="s">"/orders/2001:cancel"</span> } } }</code></pre>
+
+  <h3 id="batch">10.2 batch <span class="badge x">Extension</span></h3>
+  <p>Several operations in one request, in order, with references to the results of earlier ones. They are sent to the path declared in <code>batch.path</code>.</p>
+<pre tabindex="0"><code><span class="k">POST</span> /batch
+{ <span class="s">"atomic"</span>: false,
+  <span class="s">"operations"</span>: [
+    { <span class="s">"id"</span>: <span class="s">"a"</span>, <span class="s">"method"</span>: <span class="s">"POST"</span>, <span class="s">"path"</span>: <span class="s">"/orders"</span>, <span class="s">"body"</span>: { <span class="s">"book"</span>: { <span class="s">"id"</span>: <span class="s">"7"</span> } } },
+    { <span class="s">"id"</span>: <span class="s">"b"</span>, <span class="s">"method"</span>: <span class="s">"POST"</span>, <span class="s">"path"</span>: <span class="s">"/orders/{a#/id}:pay"</span>,
+      <span class="s">"headers"</span>: { <span class="s">"idempotency-key"</span>: <span class="s">"\"pay-2001\""</span> },
+      <span class="s">"body"</span>: { <span class="s">"amount"</span>: { <span class="s">"$ref"</span>: <span class="s">"a#/total"</span> } } } ] }
+
+<span class="c">→ 200</span>
+{ <span class="s">"results"</span>: [
+    { <span class="s">"id"</span>: <span class="s">"a"</span>, <span class="s">"status"</span>: 201, <span class="s">"headers"</span>: { <span class="s">"location"</span>: <span class="s">"/orders/2001"</span> }, <span class="s">"body"</span>: { … } },
+    { <span class="s">"id"</span>: <span class="s">"b"</span>, <span class="s">"status"</span>: 200, <span class="s">"body"</span>: { … } } ] }</code></pre>
+  <ul>
+    <li>Each operation <span class="must">MUST</span> have an <code>id</code>, unique in the batch, a <code>method</code>, a <code>path</code> and, optionally, <code>headers</code> (such as <code>If-Match</code>, <code>Idempotency-Key</code> or <code>Prefer</code>, with lowercase names) and <code>body</code>. Each operation <span class="must">MUST</span> follow the same rules as if it were sent alone.</li>
+    <li>A reference is <code>&lt;id&gt;#&lt;JSON Pointer&gt;</code> into the response body of an earlier operation: in braces inside <code>path</code>, where the value <span class="must">MUST</span> be inserted percent-encoded as a path segment (<a class="src" href="https://www.rfc-editor.org/rfc/rfc3986"><strong>RFC 3986</strong></a>), or as <code>{"$ref": …}</code> in place of a body value. An object whose only member is <code>$ref</code> is always a reference.</li>
+    <li>A body that is not a valid batch, a repeated operation <code>id</code>, a reference to an operation that does not come earlier, or a nested batch <span class="must">MUST</span> give <code>400 bad_request</code> before any operation runs. <a href="#errors">5.4</a> applies to the batch request as a whole before any operation runs; once the batch is accepted, it applies to each operation on its own, subject to the <code>424 not_executed</code> rules below. More operations than <code>max_operations</code> give <code>413 content_too_large</code>, which the server <span class="must">MAY</span> give without validating the operations (<a href="#errors">5.4</a>).</li>
+    <li>A batch that passes these checks, the atomic check below and those of any request (credentials, content type, rate limits, <a href="#idempotency">7.1</a>) <span class="must">MUST</span> get <code>200</code> with one result per operation, in order, each with its own <code>status</code>, <code>headers</code> and <code>body</code>; an error result is a problem object. This is the only exception to “no error inside a <code>200</code>” (<a href="#errors">5.4</a>).</li>
+    <li>With <code>"atomic": true</code>, either all operations take effect or none does. If one fails, it carries its error and every other operation <span class="must">MUST</span> get <code>424 not_executed</code>, including those that ran and were rolled back. A server that cannot roll back one of the operations (an external payment, an email) <span class="must">MUST</span> reject the atomic batch with <code>422 invalid</code> before running it.</li>
+    <li>Without <code>atomic</code>, each operation applies on its own; an operation whose reference cannot be resolved, because the referenced one failed or the pointer finds nothing, <span class="must">MUST</span> get <code>424 not_executed</code>.</li>
+    <li>The batch itself <span class="must">MAY</span> carry <code>Idempotency-Key</code>; then the whole batch follows <a href="#idempotency">7.1</a>.</li>
+    <li>An exception to “the same rules as if sent alone”: the texts of each new result (<a href="#language">5.6</a>) follow the batch’s <code>Accept-Language</code>, and an operation’s own is ignored; a replayed result (7.1) keeps its own. <code>Content-Language</code> and <code>Accept-Language</code> in <code>Vary</code> go on the batch response, not in each result’s <code>headers</code>: <code>Vary</code> includes <code>Accept-Language</code> only if some new result can vary by language, and <code>Content-Language</code> is left out unless every result with language-picked texts shares one.</li>
+  </ul>
+
+  <h3 id="filter-expr">10.3 filter-expr <span class="badge x">Extension</span></h3>
+  <p>A filter as an expression, in the spirit of <a class="src" href="https://google.aip.dev/160"><strong>AIP-160</strong></a>:</p>
+<pre tabindex="0"><code><span class="k">GET</span> /books?filter=price &lt;= 20 AND (category = "novela-negra" OR rating &gt;= 4.5)</code></pre>
+  <ul>
+    <li>Comparators <code>=</code>, <code>!=</code>, <code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code> and <code>&gt;=</code>, which map to <code>eq</code>, <code>ne</code>, <code>lt</code>, <code>le</code>, <code>gt</code> and <code>ge</code>; <code>AND</code>, <code>OR</code>, <code>NOT</code> and parentheses. Fields by name or dotted path; a path segment may contain <code>-</code> (<code>name.es-mx</code>). Values: strings in double quotes (with <code>\"</code> and <code>\\</code> as the only escapes), numbers, <code>true</code>, <code>false</code> and <code>null</code>. <code>field = null</code> and <code>field != null</code> map to the <code>null</code> operator.</li>
+    <li><code>NOT</code> binds tightest. <code>AND</code> and <code>OR</code> <span class="must">MUST NOT</span> be mixed at the same level without parentheses: <code>a AND b OR c</code> <span class="must">MUST</span> give <code>invalid_parameter</code>. <a class="src" href="https://google.aip.dev/160"><strong>AIP-160</strong></a> gives <code>OR</code> precedence over <code>AND</code>, most languages do the opposite; Restep asks for parentheses so nobody guesses. Juxtaposition (<code>a b</code>, <a class="src" href="https://google.aip.dev/160"><strong>AIP-160</strong></a>’s implicit AND) <span class="must">MUST</span> give <code>invalid_parameter</code> too.</li>
+    <li>A field or operator not declared in <code>filter</code> <span class="must">MUST</span> give <code>unsupported_parameter</code>. Comparisons follow <a href="#filters">6.1</a>, absent and <code>null</code> values included; a number compared with a <code>decimal</code> field is read as an exact decimal.</li>
+    <li>It cannot be combined with <code>filter[…]</code> in the same request: that <span class="must">MUST</span> give <code>invalid_parameter</code>.</li>
+  </ul>
+
+  <h3 id="query-method">10.4 query-method <span class="badge x">Extension</span></h3>
+  <p>For queries that do not fit in a URL, the <code>QUERY</code> method (<a class="src" href="https://www.rfc-editor.org/rfc/rfc10008"><strong>RFC 10008</strong></a>): safe, idempotent and cacheable, with the <code>query</code> parameters in the body.</p>
+<pre tabindex="0"><code><span class="k">QUERY</span> /books
+Content-Type: application/json
+
+{ <span class="s">"filter"</span>: { <span class="s">"price"</span>: { <span class="s">"le"</span>: <span class="s">"20"</span> }, <span class="s">"category"</span>: { <span class="s">"in"</span>: [<span class="s">"novela-negra"</span>, <span class="s">"poesia"</span>] } },
+  <span class="s">"sort"</span>: [<span class="s">"-rating"</span>], <span class="s">"fields"</span>: [<span class="s">"title"</span>, <span class="s">"price"</span>], <span class="s">"limit"</span>: 10, <span class="s">"count"</span>: true }</code></pre>
+  <ul>
+    <li>Collections that accept it <span class="must">MUST</span> announce it with <code>Accept-Query: application/json</code> (<a class="src" href="https://www.rfc-editor.org/rfc/rfc10008"><strong>RFC 10008</strong></a>) in their responses to <code>GET</code> and <code>HEAD</code>.</li>
+    <li>The body is a JSON object with the same members as the reserved parameters: <code>filter</code> as an object of fields and operators (or, with <code>filter-expr</code>, a string), <code>sort</code>, <code>fields</code> and <code>include</code> as lists, <code>limit</code> as a number and <code>count</code> as a boolean. Values use their JSON type, and <code>in</code> takes a list, so its values can contain commas. An unknown member <span class="must">MUST</span> give <code>unsupported_parameter</code>.</li>
+    <li>A <code>QUERY</code> <span class="must">MUST</span> return the same as the equivalent <code>GET</code>, with the same errors; a matching <code>If-None-Match</code> gives <code>304</code>, as for <code>GET</code> (<a href="#caching">7.3</a>). The URL <span class="must">MUST NOT</span> carry reserved parameters other than <code>cursor</code>.</li>
+    <li>In the response, <code>next</code> carries only <code>cursor</code>, which here overrides the rule of <a href="#pagination">6.4</a> that keeps the other parameters. For the next page, the client <span class="must">MUST</span> send a body with the same <code>filter</code> and <code>sort</code> to the <code>next</code> URL, and <span class="must">MAY</span> change <code>limit</code>, <code>fields</code>, <code>include</code> and <code>count</code> (<a href="#pagination">6.4</a>); the server <span class="must">MUST</span> answer a <code>filter</code> or <code>sort</code> that is not equal as a JSON value (member order and whitespace do not count; an absent member, <code>{}</code> and <code>[]</code> are the same) with <code>invalid_parameter</code> on <code>cursor</code>.</li>
+    <li>Caches that store <code>QUERY</code> responses use the body as part of the key; many CDNs do not do that yet.</li>
+  </ul>
+  <h3 id="oauth">10.5 oauth <span class="badge x">Extension</span></h3>
+  <p>How a client finds out where to get a token for the API. It defines neither authentication nor authorization: it ties the OAuth 2.0 Protected Resource Metadata (<a class="src" href="https://www.rfc-editor.org/rfc/rfc9728"><strong>RFC 9728</strong></a>) to the API root. A server that does not announce it authenticates as it sees fit.</p>
+<pre tabindex="0"><code><span class="k">GET</span> /api/                         <span class="c">(the API root: https://example.com/api/)</span>
+<span class="c">HTTP/1.1 401 Unauthorized</span>
+<span class="h">WWW-Authenticate:</span> Bearer resource_metadata="https://example.com/.well-known/oauth-protected-resource/api/"
+
+<span class="k">GET</span> https://example.com/.well-known/oauth-protected-resource/api/
+{ <span class="s">"resource"</span>: <span class="s">"https://example.com/api/"</span>,
+  <span class="s">"authorization_servers"</span>: [<span class="s">"https://auth.example.com"</span>],
+  <span class="s">"scopes_supported"</span>: [<span class="s">"books:read"</span>, <span class="s">"books:write"</span>] }</code></pre>
+  <ul>
+    <li>The server <span class="must">MUST</span> serve the metadata at the URL that <a class="src" href="https://www.rfc-editor.org/rfc/rfc9728#section-3.1"><strong>RFC 9728</strong></a> (section 3.1) forms from the API root: the well-known suffix goes between the host and the root’s path, which keeps its final slash; only when the root is the bare host does its slash go. Under <code>https://example.com/api/</code> it is <code>https://example.com/.well-known/oauth-protected-resource/api/</code>; under <code>https://api.example.com/</code>, <code>https://api.example.com/.well-known/oauth-protected-resource</code>.</li>
+    <li>In that document, <code>resource</code> <span class="must">MUST</span> be the API root, character for character, final slash included, and <code>authorization_servers</code> <span class="must">MUST</span> list at least one issuer: <a class="src" href="https://www.rfc-editor.org/rfc/rfc9728"><strong>RFC 9728</strong></a> makes it optional, but without it the client has nothing to discover. <code>scopes_supported</code> <span class="must">SHOULD</span> be present. Each authorization server describes itself with <a class="src" href="https://www.rfc-editor.org/rfc/rfc8414"><strong>RFC 8414</strong></a> or OpenID Connect Discovery; Restep requires nothing of it.</li>
+    <li>The metadata is not a resource of the API: <a href="#profile-header">4.1</a>, <a href="#resources">5.1</a>, <a href="#collections">5.2</a> and <a href="#reserved">5.3</a> do not apply to it. It <span class="must">MUST</span> be served as <code>application/json</code> without requiring credentials, so it never gives <code>401</code>, and it <span class="must">SHOULD</span> carry <code>Cache-Control: public</code> with a <code>max-age</code>.</li>
+    <li>When the API root requires credentials, its <code>401</code> <span class="must">MUST</span> carry the absolute URL of the metadata in <code>resource_metadata</code> (<a class="src" href="https://www.rfc-editor.org/rfc/rfc9728#section-5.1"><strong>RFC 9728</strong></a>, section 5.1), in at least one challenge: <code>Bearer</code>, <code>DPoP</code> or any other the API accepts. <a class="src" href="https://www.rfc-editor.org/rfc/rfc9728#section-3.3"><strong>RFC 9728</strong></a> (section 3.3) makes clients discard metadata found that way whose <code>resource</code> is not the URL they requested, so on any other resource the server <span class="must">MUST NOT</span> point <code>resource_metadata</code> at the root’s metadata. The root’s metadata is for the exact root URL, without a query. A client that gets a <code>401</code> without <code>resource_metadata</code> forms the metadata URL from the root.</li>
+    <li>OAuth errors keep their Restep codes: the challenge carries the OAuth error and the body the Restep <code>code</code>. <code>invalid_request</code> is <code>400 bad_request</code>; <code>invalid_token</code>, and <code>invalid_dpop_proof</code> and <code>use_dpop_nonce</code> (<a class="src" href="https://www.rfc-editor.org/rfc/rfc9449"><strong>RFC 9449</strong></a>), are <code>401 unauthenticated</code>; <code>insufficient_scope</code> is <code>403 forbidden</code>. A <code>403</code> for a missing scope <span class="must">MUST</span> carry <code>error="insufficient_scope"</code> in its challenge (<a class="src" href="https://www.rfc-editor.org/rfc/rfc6750#section-3.1"><strong>RFC 6750</strong></a>, section 3.1) and <span class="must">SHOULD</span> name the scope needed in <code>scope</code>, unless that would reveal permissions the client must not know. A resource whose existence is concealed still gives <code>404</code> (<a href="#errors">5.4</a>).</li>
+    <li>The server <span class="must">MUST</span> refuse a token meant for another resource server (<a class="src" href="https://www.rfc-editor.org/rfc/rfc9700#section-2.3"><strong>RFC 9700</strong></a>, section 2.3). A client asks for a token restricted to this API by sending its <code>resource</code> in the <code>resource</code> parameter (<a class="src" href="https://www.rfc-editor.org/rfc/rfc8707"><strong>RFC 8707</strong></a>).</li>
+    <li>With DPoP (<a class="src" href="https://www.rfc-editor.org/rfc/rfc9449"><strong>RFC 9449</strong></a>) the challenge uses the <code>DPoP</code> scheme. A retry with a fresh DPoP proof comes from the same principal and is the same request for <a href="#idempotency">7.1</a>.</li>
+    <li>A server that allows cross-origin requests <span class="must">SHOULD</span> list <code>WWW-Authenticate</code> in <code>Access-Control-Expose-Headers</code> (and <code>DPoP-Nonce</code>, if it uses DPoP nonces), or a browser client cannot read them, and <span class="must">SHOULD</span> serve the metadata with <code>Access-Control-Allow-Origin</code>. <code>EventSource</code> cannot send <code>Authorization</code>, so a browser client reads the event stream of <a href="#sync">9</a> with <code>fetch</code>; the server <span class="must">SHOULD NOT</span> accept tokens in the query string (<a class="src" href="https://www.rfc-editor.org/rfc/rfc6750#section-2.3"><strong>RFC 6750</strong></a>, section 2.3).</li>
+  </ul>
+</section>
+
+<section aria-labelledby="conformance">
+  <h2 id="conformance">11. Conformance</h2>
+  <p>A server conforms to a profile when it meets every requirement on servers marked <span class="must">MUST</span> or <span class="must">MUST NOT</span> in sections 3, 4 and 5 and in that profile’s section, and announces the profiles it requires. The same holds for each extension. These are the checks a conformance checker runs. <a href="/tools/"><code>restep-check</code></a> already runs those of core, evolution (the <code>Deprecation</code> and retirement of what discovery lists, and the <code>predecessor-version</code> link; not the comparison of two deployments), query, writes and oauth (for oauth, without credentials on the root and on each collection, and except the <code>insufficient_scope</code> challenge, which needs a token without some scope), and the full list of its checks is on its page; relations and sync come in a later version.</p>
+  <h3>core</h3>
+  <ul class="req">
+    <li>Every collection responds with <code>{items, next}</code>, with <code>next</code> present.</li>
+    <li>Without concurrent writes, following <code>next</code> until <code>null</code> returns every item exactly once.</li>
+    <li>An item that does not exist gives <code>404</code> as <code>problem+json</code> with <code>code: "not_found"</code>.</li>
+    <li>Every unimplemented reserved parameter gives <code>400 unsupported_parameter</code>, on every method, unless an error that comes first in 5.4 applies: with valid credentials and no other fault, a missing item with an unsupported parameter gives <code>404 not_found</code>.</li>
+    <li>An unsupported method gives <code>405</code> with <code>Allow</code>; <code>HEAD</code> works wherever <code>GET</code> does. Where discovery declares <code>methods</code> or <code>item_methods</code>, that <code>Allow</code> agrees with them.</li>
+    <li>Where discovery declares <code>status</code>, <code>GET</code> and <code>HEAD</code> on it give <code>200</code> or <code>503</code> with <code>Cache-Control: no-store</code>, or else <code>401</code>, <code>403</code> or <code>429</code>.</li>
+    <li>Every <code>invalid_parameter</code> and <code>unsupported_parameter</code> names its parameter in <code>parameter</code>.</li>
+    <li>Where discovery declares a <code>create</code> schema, a <code>POST</code> that leaves out a property it requires gives <code>422</code>; where it declares a closed <code>update</code> schema, so does a <code>PATCH</code> with a member the schema does not allow, even a <code>null</code> one, once the members 5.1 ignores are dropped.</li>
+    <li>Every error carries <code>type</code>, <code>title</code>, a <code>status</code> equal to the response’s, and a <code>code</code> from the list or derived from the IANA registry.</li>
+    <li>If discovery declares <code>reasons</code>, every problem with a <code>reason</code>, also in <code>batch</code> results, carries a declared one with its <code>code</code>.</li>
+    <li>A <code>PATCH</code> with <code>{"author": {"id": "4", "extra": 1}}</code> changes the link, does not store <code>extra</code> and leaves both authors untouched, unless a declared <code>update</code> schema rejects it.</li>
+    <li>Merge Patch follows <a class="src" href="https://www.rfc-editor.org/rfc/rfc7396"><strong>RFC 7396</strong></a> (an array or scalar replaced by an object loses its old content), except that relationship objects are replaced whole (5.1) and language maps left with no translations read as <code>{}</code> (3) and that deleting or changing an own field of <code>inherit</code> also changes its effective field (5.7), and a write that changes <code>id</code> gives <code>422</code>.</li>
+    <li>A <code>PATCH</code> with an item’s read-only fields as read changes neither its body nor its <code>ETag</code>, if any; another value in <code>id</code>, or in a top-level property the client can read that its <code>item</code> schema marks <code>readOnly</code> directly in <code>properties</code>, gives <code>422 invalid</code> with a <code>read_only</code> entry at its pointer, changing nothing.</li>
+    <li>If discovery declares <code>inherit</code> on a collection where <code>PATCH</code> is supported: sending back with <code>PATCH</code> only an item’s effective fields as read, without its own fields, changes neither its body nor its <code>ETag</code>; <code>{"tax_rate_own": null}</code> leaves the effective value equal to its source’s and, if there is <code>_inherited</code>, it names it; and a different value in the effective field gives <code>422 invalid</code> with a <code>read_only</code> entry at <code>/tax_rate</code>, changing nothing.</li>
+    <li>An error requested with an <code>Accept-Language</code> the server does not offer, or a malformed one, gives the same <code>code</code> as without the header, never <code>406</code> or <code>400</code> because of it. Where the body of the discovery document or of an error changes between two <code>Accept-Language</code> values, both responses, the default language’s included, carry <code>Vary: Accept-Language</code> and, if they carry an <code>ETag</code>, different ones.</li>
+    <li>With <code>Accept-Encoding: identity</code>, the <code>GET</code> of an item gives the same body under any <code>Accept-Language</code> (and, with <code>writes</code>, the same <code>ETag</code>).</li>
+    <li>In an item, every field of <code>language_maps</code> is an object of strings with lowercase keys. Where <code>PATCH</code> is supported: an uppercase key gives <code>422 invalid</code> with a <code>format</code> entry at <code>/name/ES</code>; deleting an existing translation with <code>null</code> keeps the others, and putting it back restores it; <code>{"name": null}</code> leaves <code>{}</code>.</li>
+  </ul>
+  <h3>Evolution</h3>
+  <ul class="req">
+    <li>Whatever discovery lists in <code>deprecations</code> carries <code>Deprecation</code> in the responses that use it; after its <code>sunset</code> it responds as <a href="#versions">5.5</a> says.</li>
+    <li>Comparing the discovery documents of two deployments of the same version, nothing declared disappears unless it was listed in <code>deprecations</code> and its <code>sunset</code> has passed.</li>
+  </ul>
+  <h3>query</h3>
+  <ul class="req">
+    <li>Each declared filter returns only items that match it, comparing by the declared type (decimals exactly).</li>
+    <li>An undeclared filter field, operator or sort key gives <code>unsupported_parameter</code>; a value of the wrong type, <code>invalid_parameter</code>.</li>
+    <li><code>sort</code> orders and breaks ties stably across pages.</li>
+    <li><code>limit</code> above <code>max_limit</code> gives <code>invalid_parameter</code>; so does a tampered cursor, or one reused with other filters, another sort or another collection; changing <code>limit</code>, <code>fields</code>, <code>include</code> or <code>count</code> between pages keeps it valid.</li>
+    <li>No field of <code>language_maps</code>, nor any path that ends in or goes through one, is declared in <code>filter</code> or <code>sort</code>; a declared <code>field.tag</code> filter or sort reads only that key, and items without it are absent.</li>
+    <li><code>fields</code> returns only those fields, plus <code>id</code> and members starting with <code>_</code>.</li>
+    <li><code>count=true</code> adds <code>total</code> when <code>count</code> is declared, and gives <code>unsupported_parameter</code> when it is not.</li>
+  </ul>
+  <h3>writes</h3>
+  <ul class="req">
+    <li>Repeating a <code>POST</code> with the same <code>Idempotency-Key</code> after the first one has finished returns the same response and creates nothing new.</li>
+    <li>The same key with another body gives <code>422 idempotency_mismatch</code>.</li>
+    <li>The <code>ETag</code> of a full item, asked for with <code>Accept-Encoding: identity</code>, is strong, and a response with <code>fields</code> carries it in <code>_etag</code>; a write ignores <code>_</code> members.</li>
+    <li><code>If-Match</code> with an old <code>ETag</code> gives <code>412</code>, also when two writes race; a list that contains the current one succeeds. <code>If-None-Match</code> with the current one, weak or strong, gives <code>304</code> to a <code>GET</code> and <code>412</code> to a write.</li>
+    <li>Every response to a <code>GET</code> or <code>HEAD</code>, errors included, carries <code>Cache-Control</code>.</li>
+  </ul>
+  <h3>oauth</h3>
+  <ul class="req">
+    <li>The metadata is at the URL <a class="src" href="https://www.rfc-editor.org/rfc/rfc9728"><strong>RFC 9728</strong></a> forms from the root, as JSON, without requiring credentials, with <code>resource</code> equal to the root and at least one authorization server.</li>
+    <li>The metadata does not give <code>401</code> (and, as a recommendation, carries <code>Cache-Control: public</code>).</li>
+    <li>If the root requires credentials, its <code>401</code> carries that absolute URL in <code>resource_metadata</code>; no <code>401</code> elsewhere points there.</li>
+    <li>A token without the scope a request needs gets, unless the resource’s existence is concealed, <code>403</code> with <code>code: "forbidden"</code> and <code>error="insufficient_scope"</code> in the challenge.</li>
+  </ul>
+  <h3>relations and sync</h3>
+  <ul class="req">
+    <li>Relationships are objects with an <code>id</code>, also without <code>include</code>, and every relationship is declared.</li>
+    <li><code>include</code> on a declared, expandable relationship fills the object; on any other, <code>unsupported_parameter</code>.</li>
+    <li><code>:changes</code> reports, in the lists <a href="#sync">9</a> calls for, the creation, update and deletion of an item since the previous <code>state</code>, and every page of a traversal carries the same <code>state</code>; deleting an item mid-traversal does not make the traversal miss another one.</li>
+  </ul>
+</section>
+
+<section aria-labelledby="open">
+  <h2 id="open">12. Open questions</h2>
+  <ul>
+    <li>Should caching (<a href="#caching">7.3</a>) be a profile of its own, so a server can offer it without building the idempotency store of 7.1?</li>
+    <li>Long-running operations: <code>202 Accepted</code> and an operation resource (as in <a class="src" href="https://google.aip.dev/151"><strong>AIP-151</strong></a>), so each API does not invent its own.</li>
+    <li>Date-based versioning in a header (as Stripe does) as an alternative to the version in the path.</li>
+    <li>Should the profile and error URIs move to a persistent identifier (such as w3id.org) before 1.0, when they can still change?</li>
+    <li>Keeping filtered views in sync (as JMAP’s <code>queryChanges</code>).</li>
+    <li>Things that can come later as additions, without breaking anyone: named views (<code>$view</code>), a <code>prev</code> link for backward paging, batch results streamed as they finish, and reusing a <code>QUERY</code> through the <code>Location</code> <a class="src" href="https://www.rfc-editor.org/rfc/rfc10008"><strong>RFC 10008</strong></a> already defines.</li>
+    <li>Signed messages (<a class="src" href="https://www.rfc-editor.org/rfc/rfc9421"><strong>RFC 9421</strong></a>, with <code>Content-Digest</code> from <a class="src" href="https://www.rfc-editor.org/rfc/rfc9530"><strong>RFC 9530</strong></a> and keys published as JWKS, <a class="src" href="https://www.rfc-editor.org/rfc/rfc7517"><strong>RFC 7517</strong></a>) for integrity between companies through intermediaries. Restep 1 has no case that needs them: TLS covers the client and the server, and the events of <a href="#sync">9</a> carry no data. A signature that expires would also give <code>401</code> to a retry before it reaches the idempotency store of <a href="#idempotency">7.1</a>.</li>
+    <li>An <code>openapi</code> extension: what an OpenAPI description of a Restep API must say (a description per operation, request bodies, errors as <code>problem+json</code>) and how a checker would hold it to the discovery document, which would still prevail.</li>
+    <li>Marking actions whose effects cannot be undone or reach outside the API (a payment, an email), so a client can ask a person first, as MCP’s <code>destructiveHint</code> and <code>x-openai-isConsequential</code> do. A single flag does not tell “deletes data” from “charges someone”.</li>
+    <li>A projection by language (<code>languages</code>, already reserved) so clients need not receive whole language maps.</li>
+    <li>Sorting with language rules (CLDR collation): today <code>sort=name.es-es</code> puts “Ñora” after “Zanahoria”.</li>
+    <li>Text direction (<code>dir</code>, from the W3C’s <a class="src" href="https://www.w3.org/TR/string-meta/">Strings on the Web</a>), which a language tag is not enough to infer. It would go in each field’s object in <code>language_maps</code>, never changing the type of the values.</li>
+    <li>Declaring in advance which operations require <code>Idempotency-Key</code> (<a href="#idempotency">7.1</a>) or <code>If-Match</code> (<a href="#concurrency">7.2</a>), instead of learning it from a <code>400</code> or a <code>428</code>.</li>
+    <li>Inheriting values that are not scalars (<a href="#inheritance">5.7</a>): a language map translation by translation, or an object field by field.</li>
+    <li>Local times in a time zone (<a class="src" href="https://www.rfc-editor.org/rfc/rfc9557"><strong>RFC 9557</strong></a>, <code>2026-03-30T10:00:00+02:00[Europe/Madrid]</code>), declared like <code>language_maps</code>. <a class="src" href="https://www.rfc-editor.org/rfc/rfc9557"><strong>RFC 9557</strong></a> describes fixed instants with zone information; a future local time whose instant follows changes to its zone’s rules is left to the application, and Restep would have to say which of the two such a field is.</li>
+    <li>Soft deletion: what a <code>GET</code> on a deleted item answers, how the trash is seen, restoring with the same <code>id</code>, and purging. Under <a href="#sync">9</a>, an item that becomes visible again appears as <code>created</code> or <code>updated</code>, depending on the window.</li>
+    <li>Units of measure: a fixed unit per field, declared in discovery with <a class="src" href="https://ucum.org/">UCUM</a> codes without changing the value’s type, unlike a unit that varies per item, which goes with its value as an amount goes with its currency (<a href="#data">3</a>).</li>
+    <li>Manual order: moving an item among others without rewriting all of them (fractional keys sorted by code point, or a <code>:move</code> action with <code>before</code> and <code>after</code>).</li>
+    <li>Values as of a date (<code>$as_of</code>): separating when a value applies from when it was recorded, and what it does to validators, <code>state</code> and cursors.</li>
+  </ul>
+  <p>Settled in draft 5: a link to the documentation for people (<code>service-doc</code>, <a href="#discovery">4.2</a>); and a catalogue of domain reasons in discovery (<a href="#errors">5.4</a>), at the root only, in which a reason has one <code>code</code> and, once declared, stays until the next major version; that a read-only field sent back with its current value is ignored, and a <code>PATCH</code> that would change no data leaves the item as it was, <code>updated_at</code> and <code>ETag</code> included (<a href="#resources">5.1</a>); and that in <code>:changes</code> an item’s visibility picks its list, so one created and destroyed within the window is reported in <code>destroyed</code> if the client could see it (<a href="#sync">9</a>).</p>
+  <p>Settled in draft 4: how a client discovers authorization, with the <a href="#oauth"><code>oauth</code></a> extension, without new error codes or scopes in discovery; that an idempotency key and a cursor belong to the principal, not to the token (<a href="#idempotency">7.1</a>, <a href="#pagination">6.4</a>); that <code>api-catalog</code> is optional (<a href="#discovery">4.2</a>); what helps agents and other generic clients use an API without trying it, as optional members of discovery (<a href="#describing">4.3</a>): the methods of each collection, short descriptions, and JSON Schemas for items and request bodies; <code>parameter</code> on every <code>invalid_parameter</code> (<a href="#reserved">5.3</a>) and <code>detail</code> as a recommendation (<a href="#errors">5.4</a>); several <code>service-desc</code> links (<a href="#discovery">4.2</a>); the method of an action, declared (<a href="#actions">10.1</a>), so a <code>GET</code> action of an earlier draft now says <code>"method": "GET"</code>; how to find the service status, without a fixed path (<a href="#health">4.4</a>); and languages: the API’s texts follow <code>Accept-Language</code> (<a href="#language">5.6</a>), data never does, and translated text goes in language maps with lowercase tags, which can be filtered and sorted by exact tag (<a href="#data">3</a>, <a href="#filters">6.1</a>); and inherited values, with a read-only effective field and an own field that is written, so that sending back what was read never pins an inherited value (<a href="#inheritance">5.7</a>).</p>
+  <p>Settled in draft 3: the order between errors (<a href="#errors">5.4</a>); an item’s path (<a href="#resources">5.1</a>); what a cursor is bound to (<a href="#pagination">6.4</a>); filters repeated in either form, ranges as two filters on one field, and <code>null</code> on booleans (<a href="#filters">6.1</a>); invalidation with cache groups (<a href="#caching">7.3</a>); and how a client resumes the event stream (<a href="#sync">9</a>).</p>
+  <p>Settled in draft 2: <code>filter[field][op]</code> is enough for <code>query</code>, and expressions stay in <code>filter-expr</code>; no dedicated media type, since <code>application/json</code>, <code>application/problem+json</code> and the profile URIs are enough; discovery declares field types only where Restep needs them (<a href="#discovery">4.2</a>); and there is no per-field cache policy in Restep 1, because each combination of <code>fields</code> is already its own URL for a cache.</p>
+</section>
+
+<section aria-labelledby="references">
+  <h2 id="references">13. References</h2>
+  <ul>
+    <li><a href="https://www.rfc-editor.org/rfc/rfc9110"><strong>RFC 9110</strong></a>: HTTP semantics (methods, <code>ETag</code>, <code>If-Match</code>, <code>If-None-Match</code>).</li>
+    <li><a href="https://www.rfc-editor.org/rfc/rfc9457"><strong>RFC 9457</strong></a>: Problem Details for HTTP APIs.</li>
+    <li><a href="https://www.rfc-editor.org/rfc/rfc5646"><strong>RFC 5646</strong></a>: language tags. <a href="https://www.rfc-editor.org/rfc/rfc4647"><strong>RFC 4647</strong></a>: matching of language tags (<em>lookup</em>).</li>
+    <li><a href="https://www.rfc-editor.org/rfc/rfc7396"><strong>RFC 7396</strong></a>: JSON Merge Patch. <a href="https://www.rfc-editor.org/rfc/rfc5789"><strong>RFC 5789</strong></a>: <code>PATCH</code> and <code>Accept-Patch</code>.</li>
+    <li><a href="https://www.rfc-editor.org/rfc/rfc6901"><strong>RFC 6901</strong></a>: JSON Pointer. <a href="https://www.rfc-editor.org/rfc/rfc8259"><strong>RFC 8259</strong></a>: JSON.</li>
+    <li>IETF draft for <a href="https://datatracker.ietf.org/doc/draft-inadarei-api-health-check/">the Health Check Response Format</a>: <code>application/health+json</code> (<a href="#health">4.4</a>).</li>
+    <li><a href="https://json-schema.org/draft/2020-12"><strong>JSON Schema 2020-12</strong></a>: the schemas of <a href="#describing">4.3</a>.</li>
+    <li><a href="https://www.rfc-editor.org/rfc/rfc3986"><strong>RFC 3986</strong></a>: URIs. <a href="https://www.rfc-editor.org/rfc/rfc6570"><strong>RFC 6570</strong></a>: URI templates.</li>
+    <li><a href="https://www.rfc-editor.org/rfc/rfc6906"><strong>RFC 6906</strong></a>: the <code>profile</code> link relation. <a href="https://www.rfc-editor.org/rfc/rfc8631"><strong>RFC 8631</strong></a>: <code>service-desc</code>, <code>service-doc</code> and <code>status</code>. <a href="https://www.rfc-editor.org/rfc/rfc8288"><strong>RFC 8288</strong></a>: web linking (<code>Link</code>, <code>anchor</code>, <code>hreflang</code>).</li>
+    <li><a href="https://www.rfc-editor.org/rfc/rfc7240"><strong>RFC 7240</strong></a>: <code>Prefer</code> and <code>Preference-Applied</code>.</li>
+    <li><a href="https://www.rfc-editor.org/rfc/rfc6585"><strong>RFC 6585</strong></a>: <code>428</code> and <code>429</code>. <a href="https://www.rfc-editor.org/rfc/rfc4918"><strong>RFC 4918</strong></a>: <code>424</code>.</li>
+    <li><a href="https://www.rfc-editor.org/rfc/rfc3339"><strong>RFC 3339</strong></a>: dates and times.</li>
+    <li><a href="https://www.rfc-editor.org/rfc/rfc9651"><strong>RFC 9651</strong></a>: Structured Field Values for HTTP.</li>
+    <li><a href="https://www.rfc-editor.org/rfc/rfc10008"><strong>RFC 10008</strong></a>: the <code>QUERY</code> method.</li>
+    <li><a href="https://www.rfc-editor.org/rfc/rfc9875"><strong>RFC 9875</strong></a>: HTTP Cache Groups.</li>
+    <li><a href="https://www.rfc-editor.org/rfc/rfc8620"><strong>RFC 8620</strong></a>: JMAP, changes and back-references between operations.</li>
+    <li><a href="https://www.rfc-editor.org/rfc/rfc9745"><strong>RFC 9745</strong></a> and <a href="https://www.rfc-editor.org/rfc/rfc8594"><strong>RFC 8594</strong></a>: <code>Deprecation</code> and <code>Sunset</code>.</li>
+    <li><a href="https://www.rfc-editor.org/rfc/rfc5829"><strong>RFC 5829</strong></a>: the <code>successor-version</code> and <code>predecessor-version</code> relations.</li>
+    <li><a href="https://www.rfc-editor.org/rfc/rfc9728"><strong>RFC 9728</strong></a>: OAuth 2.0 Protected Resource Metadata. <a href="https://www.rfc-editor.org/rfc/rfc8414"><strong>RFC 8414</strong></a> and <a href="https://openid.net/specs/openid-connect-discovery-1_0.html">OpenID Connect Discovery 1.0</a>: authorization server metadata.</li>
+    <li><a href="https://www.rfc-editor.org/rfc/rfc6750"><strong>RFC 6750</strong></a>: Bearer tokens and their challenges. <a href="https://www.rfc-editor.org/rfc/rfc9449"><strong>RFC 9449</strong></a>: DPoP. <a href="https://www.rfc-editor.org/rfc/rfc8707"><strong>RFC 8707</strong></a>: resource indicators. <a href="https://www.rfc-editor.org/rfc/rfc9700"><strong>RFC 9700</strong></a>: OAuth 2.0 security best current practice.</li>
+    <li><a href="https://www.rfc-editor.org/rfc/rfc9727"><strong>RFC 9727</strong></a>: <code>api-catalog</code>.</li>
+    <li><a href="https://www.rfc-editor.org/rfc/rfc2119"><strong>RFC 2119</strong></a> and <a href="https://www.rfc-editor.org/rfc/rfc8174"><strong>RFC 8174</strong></a>: requirement key words.</li>
+    <li>IETF draft for <a href="https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/">the <code>Idempotency-Key</code> header</a> (revision 08).</li>
+    <li>Google’s <a href="https://google.aip.dev/136"><strong>AIP-136</strong></a>, <a href="https://google.aip.dev/158"><strong>AIP-158</strong></a> and <a href="https://google.aip.dev/160"><strong>AIP-160</strong></a>.</li>
+    <li><a href="https://jsonapi.org/format/">JSON:API 1.1</a>.</li>
+    <li><a href="https://html.spec.whatwg.org/multipage/server-sent-events.html">Server-Sent Events</a>.</li>
+  </ul>
+</section>
+</main>
+</div>
+
+<footer class="site">
+  <p>Restep is an open draft by <a href="https://wubytes.com/">wubytes</a>. It grew out of comparing fifteen API contracts in <a href="https://rest.wubytes.com/" hreflang="es">Cliente y Servidor</a>.</p>
+  <p>Reference implementation: <a href="/ref/restep-server.mjs">restep-server.mjs</a> (core, query and writes profiles, and the oauth extension with <code>RESTEP_TOKEN</code> set).</p>
+</footer>
+</div>
+</body>
+</html>

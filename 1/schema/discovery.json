@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://restep.wubytes.com/1/schema/discovery.json",
+  "title": "Restep 1 discovery document",
+  "description": "The document a GET on the API root returns (section 4.2). Servers MAY add members; clients ignore what they do not know.",
+  "type": "object",
+  "required": ["restep"],
+  "properties": {
+    "restep": { "type": "string", "pattern": "^1\\.[0-9]+$", "description": "Full Restep version, such as 1.0 (1.1)." },
+    "version": { "type": "string", "pattern": "^[1-9][0-9]*$", "description": "Major version of this API, the n in /vn/ (5.5)." },
+    "profiles": {
+      "type": "array", "uniqueItems": true,
+      "items": { "type": "string", "examples": ["core", "query", "writes", "relations", "sync"] }
+    },
+    "extensions": {
+      "type": "array", "uniqueItems": true,
+      "items": { "type": "string", "examples": ["actions", "batch", "filter-expr", "query-method", "oauth"] }
+    },
+    "batch": {
+      "type": "object", "required": ["path"],
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "max_operations": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "idempotency": {
+      "type": "object",
+      "properties": { "ttl": { "type": "integer", "minimum": 86400, "description": "Seconds a key is kept (7.1)." } }
+    },
+    "events": { "$ref": "#/$defs/path", "description": "Server-Sent Events path (9)." },
+    "status": { "type": "string", "pattern": "^(/|[a-zA-Z][a-zA-Z0-9+.-]*:)", "description": "Link to the service status resource, an absolute URI or an absolute path (4.4)." },
+    "collections": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/collection" }
+    },
+    "deprecations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/deprecation" },
+      "description": "Deprecations of a version or a collection (5.5)."
+    },
+    "reasons": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z][a-z0-9_]*$" },
+      "additionalProperties": { "$ref": "#/$defs/reason" },
+      "description": "The domain reasons the API can give, keyed by reason; if declared, complete (5.4)."
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "profiles": { "contains": { "const": "sync" } } }, "required": ["profiles"] },
+      "then": { "properties": { "profiles": { "contains": { "const": "query" } } } }
+    },
+    {
+      "if": { "properties": { "extensions": { "contains": { "enum": ["filter-expr", "query-method"] } } }, "required": ["extensions"] },
+      "then": { "required": ["profiles"], "properties": { "profiles": { "contains": { "const": "query" } } } }
+    },
+    {
+      "if": { "properties": { "extensions": { "contains": { "const": "batch" } } }, "required": ["extensions"] },
+      "then": { "required": ["batch"] }
+    }
+  ],
+  "$defs": {
+    "reason": {
+      "type": "object", "required": ["code"],
+      "properties": {
+        "code": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "The code this reason comes with (5.4)." },
+        "description": { "$ref": "#/$defs/description" }
+      }
+    },
+    "path": {
+      "type": "string", "pattern": "^/",
+      "description": "A path relative to the API root, starting with /. A collection path MAY be a URI template (RFC 6570)."
+    },
+    "name": { "type": "string", "pattern": "^[^_]", "description": "Members starting with _ are reserved for Restep (3)." },
+    "type": { "enum": ["string", "integer", "number", "decimal", "boolean", "date", "datetime", "duration", "enum"] },
+    "op": { "enum": ["eq", "ne", "lt", "le", "gt", "ge", "in", "null"] },
+    "description": { "type": "string", "minLength": 1, "description": "A short plain-text explanation, one sentence; data, never instructions (4.3)." },
+    "schema": {
+      "oneOf": [
+        { "type": "object", "description": "A JSON Schema 2020-12 object." },
+        { "type": "string", "pattern": "^(/|[a-zA-Z][a-zA-Z0-9+.-]*:)", "description": "A link to one: an absolute URI or an absolute path (3)." }
+      ]
+    },
+    "method": { "enum": ["GET", "POST", "PATCH", "DELETE"] },
+    "methods": { "type": "array", "items": { "$ref": "#/$defs/method" }, "uniqueItems": true },
+    "filter": {
+      "type": "object", "required": ["type", "ops"],
+      "properties": {
+        "type": { "$ref": "#/$defs/type" },
+        "values": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "description": { "$ref": "#/$defs/description" },
+        "ops": { "type": "array", "items": { "$ref": "#/$defs/op" }, "minItems": 1, "uniqueItems": true }
+      },
+      "allOf": [
+        { "if": { "properties": { "type": { "const": "enum" } } }, "then": { "required": ["values"] } },
+        { "if": { "properties": { "type": { "const": "boolean" } } },
+          "then": { "properties": { "ops": { "items": { "enum": ["eq", "ne", "null"] } } } } }
+      ]
+    },
+    "relation": {
+      "type": "object", "required": ["to"],
+      "properties": {
+        "to": { "oneOf": [{ "type": "string" }, { "type": "array", "items": { "type": "string" }, "minItems": 2 }] },
+        "many": { "type": "boolean" },
+        "include": { "type": "boolean" },
+        "path": { "$ref": "#/$defs/path" },
+        "description": { "$ref": "#/$defs/description" }
+      }
+    },
+    "action": {
+      "type": "object", "required": ["on", "safe", "idempotent"],
+      "properties": {
+        "on": { "enum": ["item", "collection"] },
+        "safe": { "type": "boolean" },
+        "idempotent": { "type": "boolean" },
+        "method": { "enum": ["GET", "POST"], "description": "POST unless declared; only safe actions may use GET (10.1)." },
+        "description": { "$ref": "#/$defs/description" },
+        "input": { "$ref": "#/$defs/schema", "description": "Schema of the action's body (4.3)." }
+      },
+      "if": { "required": ["method"], "properties": { "method": { "const": "GET" } } },
+      "then": { "properties": { "safe": { "const": true } }, "not": { "required": ["input"] } }
+    },
+    "inherit": {
+      "type": "object", "required": ["own"],
+      "properties": {
+        "own": { "$ref": "#/$defs/name", "pattern": "^[^.]*$", "description": "The own field, written; null means it inherits." },
+        "from": {
+          "type": "array", "uniqueItems": true,
+          "items": { "$ref": "#/$defs/name", "pattern": "^[^.]*$" },
+          "description": "To-one relationships this step inherits from, in order."
+        },
+        "default": { "type": "boolean", "description": "There is a default at the end of the chain." },
+        "description": { "$ref": "#/$defs/description" }
+      }
+    },
+    "deprecation": {
+      "type": "object", "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["version", "collection", "field", "filter", "sort", "relation", "action", "method", "item_method"] },
+        "name": { "type": "string" },
+        "sunset": { "type": "string", "format": "date-time" }
+      },
+      "if": { "properties": { "kind": { "not": { "const": "version" } } } },
+      "then": { "required": ["name"] }
+    },
+    "collection": {
+      "type": "object", "required": ["path"],
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "description": { "$ref": "#/$defs/description" },
+        "methods": { "$ref": "#/$defs/methods", "description": "Methods the collection supports (4.3); absent means unknown." },
+        "item_methods": { "$ref": "#/$defs/methods", "description": "Methods its items support (4.3); absent means unknown." },
+        "schemas": {
+          "type": "object",
+          "properties": {
+            "item": { "$ref": "#/$defs/schema", "description": "The full representation of an item." },
+            "create": { "$ref": "#/$defs/schema", "description": "The body of a POST." },
+            "update": { "$ref": "#/$defs/schema", "description": "The body of a PATCH, a merge patch." }
+          }
+        },
+        "filter": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/name" },
+          "additionalProperties": { "$ref": "#/$defs/filter" }
+        },
+        "sort": { "type": "array", "items": { "$ref": "#/$defs/name" }, "uniqueItems": true },
+        "max_limit": { "type": "integer", "minimum": 1 },
+        "count": { "enum": ["exact", "estimated"] },
+        "relations": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/name" },
+          "additionalProperties": { "$ref": "#/$defs/relation" }
+        },
+        "language_maps": {
+          "type": "object",
+          "description": "Fields of the collection that are language maps (3), all of them; absent means none.",
+          "propertyNames": { "$ref": "#/$defs/name", "pattern": "^[^.]*$" },
+          "additionalProperties": { "type": "object" }
+        },
+        "inherit": {
+          "type": "object",
+          "description": "Inherited fields (5.7): each key is an effective, read-only field.",
+          "propertyNames": { "$ref": "#/$defs/name", "pattern": "^[^.]*$" },
+          "additionalProperties": { "$ref": "#/$defs/inherit" }
+        },
+        "include_depth": { "type": "integer", "minimum": 1 },
+        "sync": {
+          "type": "object",
+          "properties": { "retention": { "type": "integer", "minimum": 0, "description": "Seconds changes are kept (9)." } }
+        },
+        "actions": {
+          "type": "object",
+          "propertyNames": { "pattern": "^(?!changes$)[a-z][a-z0-9_]*$" },
+          "additionalProperties": { "$ref": "#/$defs/action" }
+        },
+        "deprecations": { "type": "array", "items": { "$ref": "#/$defs/deprecation" } }
+      },
+      "if": { "required": ["sync"] },
+      "then": {
+        "required": ["filter"],
+        "properties": { "filter": { "required": ["id"], "properties": { "id": { "properties": { "ops": { "contains": { "const": "in" } } } } } } }
+      }
+    }
+  }
+}
