@@ -1,35 +1,37 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://restep.wubytes.com/1/schema/problem.json",
+  "$id": "https://w3id.org/restep/1/schema/problem.json",
   "title": "Restep 1 error",
-  "description": "Body of every 4xx or 5xx response: application/problem+json (RFC 9457) with a code (section 5.4). Whether code fits the status is checked by restep-check, not by this schema.",
+  "description": "Body of every 4xx or 5xx response: application/problem+json (RFC 9457) with a code (section 5.4), and of every error result in a batch (11.2). Whether code fits the status, and whether reason is declared in discovery, is checked by restep-check, not by this schema.",
   "type": "object",
   "required": ["type", "title", "status", "code"],
   "properties": {
-    "type": { "type": "string", "format": "uri-reference", "examples": ["https://restep.wubytes.com/1/errors#invalid", "about:blank"] },
+    "type": { "type": "string", "format": "uri-reference", "examples": ["https://w3id.org/restep/1/errors#invalid", "about:blank"] },
     "title": { "type": "string" },
     "status": { "type": "integer", "minimum": 400, "maximum": 599 },
     "code": {
       "type": "string", "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "From the table of 5.4, or the status's IANA description in snake_case, or http_ and the number for an unregistered status.",
       "examples": ["bad_request", "invalid_parameter", "unsupported_parameter", "idempotency_key_required", "unauthenticated",
-        "forbidden", "not_found", "method_not_allowed", "not_acceptable", "conflict", "state_expired", "retired",
+        "forbidden", "not_found", "method_not_allowed", "not_acceptable", "conflict", "request_in_progress", "state_expired",
+        "retired",
         "precondition_failed", "content_too_large", "uri_too_long", "unsupported_media_type", "invalid",
         "idempotency_mismatch", "not_executed", "precondition_required", "rate_limited", "internal", "not_implemented",
-        "unavailable"]
+        "unavailable", "bad_gateway", "http_499"]
     },
     "detail": { "type": "string" },
     "instance": { "type": "string", "format": "uri-reference" },
-    "reason": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "Domain reason defined by the API (5.4)." },
-    "parameter": { "type": "string", "description": "The parameter name as received, after percent-decoding (5.3)." },
+    "reason": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$", "description": "Domain reason defined by the API: follows the grammar of names (3) and should be snake_case (5.4)." },
+    "parameter": { "type": "string", "description": "The parameter name as received, after percent-decoding (5.3); also on a 403 for a field the principal can read in no item (6.1)." },
     "errors": {
       "type": "array",
       "items": {
         "type": "object", "required": ["code"],
         "properties": {
-          "pointer": { "type": "string", "pattern": "^(/.*)?$", "description": "JSON Pointer into the request body (RFC 6901)." },
+          "pointer": { "type": "string", "pattern": "^(/.*)?$", "description": "JSON Pointer into the request body, plain string form (RFC 6901)." },
           "parameter": { "type": "string" },
-          "header": { "type": "string" },
-          "code": { "type": "string", "examples": ["required", "type", "format", "range", "too_long", "unknown", "read_only"] },
+          "header": { "type": "string", "examples": ["Idempotency-Key"] },
+          "code": { "type": "string", "examples": ["required", "type", "format", "range", "too_long", "unknown", "read_only", "taken"] },
           "detail": { "type": "string" }
         },
         "anyOf": [{ "required": ["pointer"] }, { "required": ["parameter"] }, { "required": ["header"] }]
