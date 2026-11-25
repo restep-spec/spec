@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://w3id.org/restep/1/schema/problem.json",
   "title": "Restep 1 error",
-  "description": "Body of every 4xx or 5xx response: application/problem+json (RFC 9457) with a code (section 5.4), and of every error result in a batch (11.2). Whether code fits the status, and whether reason is declared in discovery, is checked by restep-check, not by this schema.",
+  "description": "Body of every 4xx or 5xx response: application/problem+json (RFC 9457) with a code (section 5.4), and of every error result in a batch (11.2). The table of codes is closed: each code of the table goes with its status, and a status the table does not list has http_ and its three digits as code. Whether http_ carries the status's own digits, whether type may be about:blank, and whether reason is declared in discovery, are checked by restep-check, not by this schema.",
   "type": "object",
   "required": ["type", "title", "status", "code"],
   "properties": {
@@ -10,14 +10,17 @@
     "title": { "type": "string" },
     "status": { "type": "integer", "minimum": 400, "maximum": 599 },
     "code": {
-      "type": "string", "pattern": "^[a-z][a-z0-9_]*$",
-      "description": "From the table of 5.4, or the status's IANA description in snake_case, or http_ and the number for an unregistered status.",
-      "examples": ["bad_request", "invalid_parameter", "unsupported_parameter", "idempotency_key_required", "unauthenticated",
-        "forbidden", "not_found", "method_not_allowed", "not_acceptable", "conflict", "request_in_progress", "state_expired",
-        "retired",
-        "precondition_failed", "content_too_large", "uri_too_long", "unsupported_media_type", "invalid",
-        "idempotency_mismatch", "not_executed", "precondition_required", "rate_limited", "internal", "not_implemented",
-        "unavailable", "bad_gateway", "http_499"]
+      "type": "string",
+      "description": "From the table of 5.4, or, for a status the table does not list, http_ followed by the status's three digits (5.4).",
+      "anyOf": [
+        { "enum": ["bad_request", "invalid_parameter", "unsupported_parameter", "idempotency_key_required", "unauthenticated",
+          "forbidden", "not_found", "method_not_allowed", "not_acceptable", "request_timeout", "conflict", "request_in_progress",
+          "state_expired", "retired", "precondition_failed", "content_too_large", "uri_too_long", "unsupported_media_type",
+          "misdirected_request", "invalid", "idempotency_mismatch", "not_executed", "too_early", "precondition_required",
+          "rate_limited", "internal", "not_implemented", "bad_gateway", "unavailable", "gateway_timeout"] },
+        { "pattern": "^http_[45][0-9]{2}$" }
+      ],
+      "examples": ["invalid_parameter", "not_found", "request_timeout", "too_early", "gateway_timeout", "http_418", "http_431"]
     },
     "detail": { "type": "string" },
     "instance": { "type": "string", "format": "uri-reference" },
@@ -28,7 +31,7 @@
       "items": {
         "type": "object", "required": ["code"],
         "properties": {
-          "pointer": { "type": "string", "pattern": "^(/.*)?$", "description": "JSON Pointer into the request body, plain string form (RFC 6901)." },
+          "pointer": { "type": "string", "pattern": "^(/([^~/]|~[01])*)*$", "description": "A JSON Pointer in its plain string form (RFC 6901, sections 3 and 5) into the request body; \"\" for the whole body." },
           "parameter": { "type": "string" },
           "header": { "type": "string", "examples": ["Idempotency-Key"] },
           "code": { "type": "string", "examples": ["required", "type", "format", "range", "too_long", "unknown", "read_only", "taken"] },
@@ -37,5 +40,36 @@
         "anyOf": [{ "required": ["pointer"] }, { "required": ["parameter"] }, { "required": ["header"] }]
       }
     }
-  }
+  },
+  "allOf": [
+    { "if": { "required": ["code"], "properties": { "code": { "enum": ["bad_request", "invalid_parameter", "unsupported_parameter", "idempotency_key_required"] } } }, "then": { "properties": { "status": { "const": 400 } } } },
+    { "if": { "required": ["code"], "properties": { "code": { "const": "unauthenticated" } } }, "then": { "properties": { "status": { "const": 401 } } } },
+    { "if": { "required": ["code"], "properties": { "code": { "const": "forbidden" } } }, "then": { "properties": { "status": { "const": 403 } } } },
+    { "if": { "required": ["code"], "properties": { "code": { "const": "not_found" } } }, "then": { "properties": { "status": { "const": 404 } } } },
+    { "if": { "required": ["code"], "properties": { "code": { "const": "method_not_allowed" } } }, "then": { "properties": { "status": { "const": 405 } } } },
+    { "if": { "required": ["code"], "properties": { "code": { "const": "not_acceptable" } } }, "then": { "properties": { "status": { "const": 406 } } } },
+    { "if": { "required": ["code"], "properties": { "code": { "const": "request_timeout" } } }, "then": { "properties": { "status": { "const": 408 } } } },
+    { "if": { "required": ["code"], "properties": { "code": { "enum": ["conflict", "request_in_progress"] } } }, "then": { "properties": { "status": { "const": 409 } } } },
+    { "if": { "required": ["code"], "properties": { "code": { "enum": ["state_expired", "retired"] } } }, "then": { "properties": { "status": { "const": 410 } } } },
+    { "if": { "required": ["code"], "properties": { "code": { "const": "precondition_failed" } } }, "then": { "properties": { "status": { "const": 412 } } } },
+    { "if": { "required": ["code"], "properties": { "code": { "const": "content_too_large" } } }, "then": { "properties": { "status": { "const": 413 } } } },
+    { "if": { "required": ["code"], "properties": { "code": { "const": "uri_too_long" } } }, "then": { "properties": { "status": { "const": 414 } } } },
+    { "if": { "required": ["code"], "properties": { "code": { "const": "unsupported_media_type" } } }, "then": { "properties": { "status": { "const": 415 } } } },
+    { "if": { "required": ["code"], "properties": { "code": { "const": "misdirected_request" } } }, "then": { "properties": { "status": { "const": 421 } } } },
+    { "if": { "required": ["code"], "properties": { "code": { "enum": ["invalid", "idempotency_mismatch"] } } }, "then": { "properties": { "status": { "const": 422 } } } },
+    { "if": { "required": ["code"], "properties": { "code": { "const": "not_executed" } } }, "then": { "properties": { "status": { "const": 424 } } } },
+    { "if": { "required": ["code"], "properties": { "code": { "const": "too_early" } } }, "then": { "properties": { "status": { "const": 425 } } } },
+    { "if": { "required": ["code"], "properties": { "code": { "const": "precondition_required" } } }, "then": { "properties": { "status": { "const": 428 } } } },
+    { "if": { "required": ["code"], "properties": { "code": { "const": "rate_limited" } } }, "then": { "properties": { "status": { "const": 429 } } } },
+    { "if": { "required": ["code"], "properties": { "code": { "const": "internal" } } }, "then": { "properties": { "status": { "const": 500 } } } },
+    { "if": { "required": ["code"], "properties": { "code": { "const": "not_implemented" } } }, "then": { "properties": { "status": { "const": 501 } } } },
+    { "if": { "required": ["code"], "properties": { "code": { "const": "bad_gateway" } } }, "then": { "properties": { "status": { "const": 502 } } } },
+    { "if": { "required": ["code"], "properties": { "code": { "const": "unavailable" } } }, "then": { "properties": { "status": { "const": 503 } } } },
+    { "if": { "required": ["code"], "properties": { "code": { "const": "gateway_timeout" } } }, "then": { "properties": { "status": { "const": 504 } } } },
+    {
+      "description": "http_ only for a status the table does not list (5.4).",
+      "if": { "required": ["code"], "properties": { "code": { "type": "string", "pattern": "^http_" } } },
+      "then": { "properties": { "status": { "not": { "enum": [400, 401, 403, 404, 405, 406, 408, 409, 410, 412, 413, 414, 415, 421, 422, 424, 425, 428, 429, 500, 501, 502, 503, 504] } } } }
+    }
+  ]
 }

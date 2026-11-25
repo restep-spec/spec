@@ -4,7 +4,7 @@
 and a few rules every API reinvents (errors, filters, pagination, concurrency, evolution), plus a
 discovery document that lets generic clients and agents use an API without reading its docs.
 
-Read it at <https://restep.wubytes.com/1/> ([en español](https://restep.wubytes.com/es/1/)).
+Read it at <https://w3id.org/restep/1/> ([en español](https://w3id.org/restep/es/1/)).
 
 | Path | What it is |
 |---|---|
@@ -30,6 +30,6 @@ as proposals and are applied there.
 
 ## Tools
 
-The tools are listed in [the organization](https://github.com/restep-spec) and at <https://restep.wubytes.com/tools/>.
+The tools are listed in [the organization](https://github.com/restep-spec) and at <https://w3id.org/restep/tools/>.
 
 MIT licensed.

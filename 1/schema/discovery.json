@@ -2,17 +2,21 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://w3id.org/restep/1/schema/discovery.json",
   "title": "Restep 1 discovery document",
-  "description": "The document a GET on the API root returns (section 4.2), as of draft 6. Members a server adds outside Restep start with x- (4.2); clients ignore what they do not know. Rules that relate one member to another (a collation on a declared string field, a named filter that shares no name with a filter, a subcollection path that starts with its parent's) are checked by restep-check, not by this schema.",
+  "description": "The document a GET on the API root returns (section 4.2), as of draft 7. Members a server adds outside Restep start with x- (4.2); clients ignore what they do not know. Rules that relate one member to another (a collation on a declared string field, a named filter that shares no name with a filter, a subcollection path that starts with its parent's, a localized field whose source is a language map, a method in method_effects that is in methods, a parent that names a collection or singleton of the document) are checked by restep-check, not by this schema.",
   "type": "object",
   "required": ["restep"],
   "properties": {
     "restep": {
       "type": "string",
       "pattern": "^1\\.(0|[1-9][0-9]*)(-(draft|rc)\\.(0|[1-9][0-9]*))?$",
-      "description": "Full Restep version, without leading zeros: 1.0 for a published version, 1.0-draft.6 or 1.0-rc.1 for a draft or a candidate of it (1.1).",
-      "examples": ["1.0", "1.0-draft.6", "1.0-rc.1", "1.1-draft.2"]
+      "description": "Full Restep version, without leading zeros: 1.0 for a published version, 1.0-draft.7 or 1.0-rc.1 for a draft or a candidate of it (1.1). The suffix is in lowercase.",
+      "examples": ["1.0", "1.0-draft.7", "1.0-rc.1", "1.1-draft.2"]
     },
     "version": { "type": "string", "pattern": "^[1-9][0-9]*$", "description": "Major version of this API, the n in /vn/ (5.5)." },
+    "default_language": {
+      "$ref": "#/$defs/language_tag",
+      "description": "The API's default language (5.6): the one it uses when no language in Accept-Language matches. Required where a collection declares localized fields."
+    },
     "profiles": {
       "type": "array", "uniqueItems": true,
       "items": { "type": "string", "examples": ["core", "query", "writes", "cache", "relations", "sync"] }
@@ -55,10 +59,11 @@
     },
     "reasons": {
       "type": "object",
-      "propertyNames": { "$ref": "#/$defs/reason_name" },
+      "propertyNames": { "$ref": "#/$defs/name" },
       "additionalProperties": { "$ref": "#/$defs/reason" },
       "description": "The domain reasons the API can give, keyed by reason; if declared, complete (5.4)."
-    }
+    },
+    "shared_cache": { "$ref": "#/$defs/reserved_shared_cache" }
   },
   "patternProperties": { "^x-": true },
   "additionalProperties": false,
@@ -76,10 +81,24 @@
       "then": { "required": ["batch"] }
     },
     {
-      "description": "A collection declares inherit only if extensions lists it (11.6).",
+      "description": "A collection declares inherit or inherit_items only if extensions lists inherit (11.6).",
       "anyOf": [
-        { "properties": { "collections": { "additionalProperties": { "not": { "required": ["inherit"] } } } } },
+        { "properties": { "collections": { "additionalProperties": { "not": { "anyOf": [{ "required": ["inherit"] }, { "required": ["inherit_items"] }] } } } } },
         { "required": ["extensions"], "properties": { "extensions": { "contains": { "const": "inherit" } } } }
+      ]
+    },
+    {
+      "description": "A collection declares sync only if profiles lists sync (10).",
+      "anyOf": [
+        { "properties": { "collections": { "additionalProperties": { "not": { "required": ["sync"] } } } } },
+        { "required": ["profiles"], "properties": { "profiles": { "contains": { "const": "sync" } } } }
+      ]
+    },
+    {
+      "description": "An API with localized fields declares default_language (5.6).",
+      "anyOf": [
+        { "properties": { "collections": { "additionalProperties": { "not": { "required": ["localized"] } } } } },
+        { "required": ["default_language"] }
       ]
     }
   ],
@@ -90,11 +109,17 @@
     },
     "field_path": {
       "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}(\\.[A-Za-z][A-Za-z0-9_-]{0,63})*$",
-      "description": "A field or a dotted path: names joined by ., whose last segment can be a lowercase language tag (name.es-mx) (3, 6.1)."
+      "description": "A field or a dotted path: names joined by ., through relationships or nested objects, whose last segment can be a lowercase language tag (name.es-mx) (3, 6.1)."
     },
-    "reason_name": {
-      "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$",
-      "description": "A reason: snake_case (5.4) and a name (3)."
+    "language_tag": {
+      "type": "string", "pattern": "^[A-Za-z]{1,8}(-[A-Za-z0-9]{1,8})*$",
+      "description": "A language tag (BCP 47, RFC 5646). This pattern only approximates the grammar of RFC 5646, section 2.1, and admits its private-use and grandfathered tags.",
+      "examples": ["es-es", "en", "es-419"]
+    },
+    "media_range": {
+      "type": "string", "pattern": "^(\\*/\\*|[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*/([A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*|\\*))$",
+      "description": "A media type without parameters (RFC 6838, section 4.2), whose subtype can be * to match any, or */* to match every media type (5.1).",
+      "examples": ["image/*", "application/pdf", "*/*"]
     },
     "reason": {
       "type": "object", "required": ["code"],
@@ -105,22 +130,37 @@
       "patternProperties": { "^x-": true },
       "additionalProperties": false
     },
+    "reserved_shared_cache": {
+      "description": "Reserved for a minor version, at the root and in each collection and singleton: a server of this version MUST NOT send it (4.2).",
+      "not": {}
+    },
     "path": {
       "type": "string", "pattern": "^/",
       "description": "A path relative to the API root, starting with / (2). A collection path MAY be a URI template (RFC 6570)."
     },
     "template_path": {
       "allOf": [{ "$ref": "#/$defs/path" }],
-      "pattern": "^/(?:[^{}]|\\{(?:[A-Za-z0-9_]|%[0-9A-Fa-f]{2})+(?:\\.(?:[A-Za-z0-9_]|%[0-9A-Fa-f]{2})+)*\\})*$",
+      "pattern": "^/(?:[^{}]|\\{[A-Za-z][A-Za-z0-9_]*\\})*$",
       "not": { "pattern": "\\{([^}]+)\\}.*\\{\\1\\}" },
-      "description": "A collection path: a path whose template variables, if any, are simple strings ({name}) with distinct names (4.2)."
+      "description": "A collection path, or that of a singleton with a parent: a path whose template variables, if any, are simple strings ({name}) whose names match ALPHA *( ALPHA / DIGIT / \"_\" ) and are distinct (4.2)."
     },
     "link": {
       "type": "string", "pattern": "^(/(?!/)|https?:)",
       "description": "A link in a body: an absolute path that includes the API root's path, or an absolute URI whose scheme is https or the API root's (3)."
     },
-    "type": { "enum": ["string", "integer", "number", "decimal", "boolean", "date", "datetime", "duration", "enum"] },
-    "op": { "enum": ["eq", "ne", "lt", "le", "gt", "ge", "in", "null"] },
+    "type": { "enum": ["string", "integer", "number", "decimal", "boolean", "date", "datetime", "localdatetime", "timezone", "duration", "enum"] },
+    "op": { "enum": ["eq", "ne", "lt", "le", "gt", "ge", "in", "nin", "null", "prefix", "contains"] },
+    "effects": {
+      "type": "array", "uniqueItems": true,
+      "items": { "enum": ["destroys", "external", "charges"] },
+      "description": "Consequences of an operation that a person may want to approve first (11.1); [] declares none."
+    },
+    "method_effects": {
+      "type": "object",
+      "propertyNames": { "enum": ["POST", "PATCH", "DELETE"] },
+      "additionalProperties": { "$ref": "#/$defs/effects" },
+      "description": "Effects of unsafe methods, keyed by method (4.3). An undeclared DELETE has [\"destroys\"]; any other undeclared unsafe method, all three."
+    },
     "description": { "type": "string", "minLength": 1, "description": "A short plain-text explanation, one sentence; data, never instructions (4.3)." },
     "schema": {
       "oneOf": [
@@ -136,14 +176,25 @@
         "type": { "$ref": "#/$defs/type" },
         "values": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
         "description": { "$ref": "#/$defs/description" },
-        "ops": { "type": "array", "items": { "$ref": "#/$defs/op" }, "minItems": 1, "uniqueItems": true }
+        "ops": { "type": "array", "items": { "$ref": "#/$defs/op" }, "minItems": 1, "uniqueItems": true },
+        "quantifier": {
+          "enum": ["some"],
+          "description": "On a path through one to-many relationship or a list field: an item matches when some related item or element matches (6.1). On the relationship or list field itself with null as its only operator, declared with the type of the related items' id or of the elements, it may be omitted or be some, with the same selection: null then tests the whole relationship or list (6.1). Other values are reserved for minor versions."
+        },
+        "required": { "type": "boolean", "description": "A list request without this filter gives invalid_parameter (6.1)." }
       },
       "patternProperties": { "^x-": true },
       "additionalProperties": false,
       "allOf": [
         { "if": { "properties": { "type": { "const": "enum" } } }, "then": { "required": ["values"] } },
         { "if": { "properties": { "type": { "const": "boolean" } } },
-          "then": { "properties": { "ops": { "items": { "enum": ["eq", "ne", "null"] } } } } }
+          "then": { "properties": { "ops": { "items": { "enum": ["eq", "ne", "null"] } } } } },
+        { "description": "prefix and contains only on string fields and translations (6.1).",
+          "if": { "required": ["ops"], "properties": { "ops": { "contains": { "enum": ["prefix", "contains"] } } } },
+          "then": { "properties": { "type": { "const": "string" } } } },
+        { "description": "No ne or nin on a path declared with quantifier (6.1).",
+          "if": { "required": ["quantifier"] },
+          "then": { "properties": { "ops": { "not": { "contains": { "enum": ["ne", "nin"] } } } } } }
       ]
     },
     "named_filter": {
@@ -152,11 +203,17 @@
       "properties": {
         "type": { "$ref": "#/$defs/type" },
         "values": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
-        "description": { "$ref": "#/$defs/description", "description": "Which items it returns; it is what gives the filter its meaning." }
+        "description": { "$ref": "#/$defs/description", "description": "Which items it returns; it is what gives the filter its meaning." },
+        "default": { "type": "boolean", "description": "true: the switch applies to every list request that does not turn it off with filter[name]=false (6.1)." },
+        "required": { "type": "boolean", "description": "A list request without this filter gives invalid_parameter (6.1)." }
       },
       "patternProperties": { "^x-": true },
       "additionalProperties": false,
-      "if": { "properties": { "type": { "const": "enum" } }, "required": ["type"] }, "then": { "required": ["values"] }
+      "allOf": [
+        { "if": { "properties": { "type": { "const": "enum" } }, "required": ["type"] }, "then": { "required": ["values"] } },
+        { "description": "Only a switch, a named filter without type, can be a default filter (6.1).",
+          "if": { "properties": { "default": { "const": true } }, "required": ["default"] }, "then": { "not": { "required": ["type"] } } }
+      ]
     },
     "relation": {
       "type": "object", "required": ["to"],
@@ -165,25 +222,81 @@
         "many": { "type": "boolean" },
         "include": { "type": "boolean" },
         "path": { "$ref": "#/$defs/template_path", "description": "The template of the subcollection it leads to (9)." },
+        "media_types": {
+          "type": "array", "items": { "$ref": "#/$defs/media_range" }, "minItems": 1, "uniqueItems": true,
+          "description": "To a collection that declares upload: the media types of the files it may link (5.1)."
+        },
         "description": { "$ref": "#/$defs/description" }
       },
       "patternProperties": { "^x-": true },
       "additionalProperties": false
     },
+    "param": {
+      "type": "object", "required": ["type"],
+      "description": "A query parameter of a GET action (11.1).",
+      "properties": {
+        "type": { "$ref": "#/$defs/type" },
+        "values": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "list": { "type": "boolean", "description": "Values separated by commas, read after percent-decoding (11.1)." },
+        "required": { "type": "boolean", "description": "Missing, it gives invalid_parameter (11.1)." },
+        "description": { "$ref": "#/$defs/description" }
+      },
+      "patternProperties": { "^x-": true },
+      "additionalProperties": false,
+      "if": { "properties": { "type": { "const": "enum" } }, "required": ["type"] }, "then": { "required": ["values"] }
+    },
     "action": {
-      "type": "object", "required": ["on", "safe", "idempotent"],
+      "type": "object", "required": ["safe", "idempotent"],
+      "description": "An action (11.1). A collection's actions carry on; a singleton's do not.",
       "properties": {
         "on": { "enum": ["item", "collection"] },
         "safe": { "type": "boolean" },
         "idempotent": { "type": "boolean" },
         "method": { "enum": ["GET", "POST"], "description": "POST unless declared; only safe actions may use GET (11.1)." },
         "description": { "$ref": "#/$defs/description" },
-        "input": { "$ref": "#/$defs/schema", "description": "Schema of the action's body (4.3)." }
+        "effects": { "$ref": "#/$defs/effects", "description": "Without it, a client treats the action as having all three effects; a safe action declares only charges (11.1)." },
+        "input": { "$ref": "#/$defs/schema", "description": "Schema of the action's body, for a POST action (4.3)." },
+        "params": {
+          "type": "object",
+          "description": "Query parameters of a GET action, keyed by name (11.1).",
+          "propertyNames": { "$ref": "#/$defs/name" },
+          "additionalProperties": { "$ref": "#/$defs/param" }
+        },
+        "output": { "$ref": "#/$defs/schema", "description": "Schema of a safe action's result, which is not a representation (11.1)." }
       },
       "patternProperties": { "^x-": true },
       "additionalProperties": false,
-      "if": { "required": ["method"], "properties": { "method": { "const": "GET" } } },
-      "then": { "properties": { "safe": { "const": true } }, "not": { "required": ["input"] } }
+      "allOf": [
+        { "if": { "required": ["method"], "properties": { "method": { "const": "GET" } } },
+          "then": { "properties": { "safe": { "const": true } }, "not": { "required": ["input"] } } },
+        { "description": "params only on a GET action (11.1).",
+          "if": { "required": ["params"] }, "then": { "required": ["method"], "properties": { "method": { "const": "GET" } } } },
+        { "description": "output only on a safe action (11.1).",
+          "if": { "required": ["output"] }, "then": { "required": ["safe"], "properties": { "safe": { "const": true } } } },
+        { "description": "A safe action declares only charges (11.1).",
+          "if": { "required": ["safe"], "properties": { "safe": { "const": true } } }, "then": { "properties": { "effects": { "items": { "const": "charges" } } } } },
+        { "description": "A safe action is idempotent (11.1; RFC 9110, section 9.2.2).",
+          "if": { "required": ["safe"], "properties": { "safe": { "const": true } } }, "then": { "properties": { "idempotent": { "const": true } } } }
+      ]
+    },
+    "collection_action": {
+      "allOf": [{ "$ref": "#/$defs/action" }],
+      "required": ["on"]
+    },
+    "singleton_action": {
+      "allOf": [{ "$ref": "#/$defs/action" }],
+      "not": { "required": ["on"] },
+      "description": "An action of a singleton, used at {path}:{name}; it carries no on (11.1)."
+    },
+    "switch": {
+      "type": "object", "required": ["field", "initial"],
+      "description": "A boolean field of the item itself: while it is false, nothing comes from above (11.6).",
+      "properties": {
+        "field": { "$ref": "#/$defs/name" },
+        "initial": { "type": "boolean", "description": "The value a POST that leaves the field out gives it." }
+      },
+      "patternProperties": { "^x-": true },
+      "additionalProperties": false
     },
     "inherit": {
       "type": "object", "required": ["own"],
@@ -195,6 +308,28 @@
           "description": "To-one relationships this step inherits from, in order."
         },
         "default": { "type": "boolean", "description": "There is a default at the end of the chain." },
+        "combine": { "enum": ["replace", "fields"], "description": "replace (the default) takes the own value whole; fields, for objects of scalars, resolves each member on its own (11.6)." },
+        "switch": { "$ref": "#/$defs/switch" },
+        "description": { "$ref": "#/$defs/description" }
+      },
+      "patternProperties": { "^x-": true },
+      "additionalProperties": false
+    },
+    "inherit_items": {
+      "type": "object", "required": ["from"],
+      "description": "Inherited items of a subcollection (11.6).",
+      "properties": {
+        "from": {
+          "type": "array", "uniqueItems": true, "minItems": 1,
+          "items": { "$ref": "#/$defs/field_path" },
+          "description": "To-one relationships of the parent item, in order, through which the same subcollection of the source is found."
+        },
+        "key": {
+          "type": "array", "uniqueItems": true, "minItems": 1,
+          "items": { "$ref": "#/$defs/name" },
+          "description": "Fields that identify an item across levels; without it, inherited and own items add up."
+        },
+        "switch": { "$ref": "#/$defs/switch" },
         "description": { "$ref": "#/$defs/description" }
       },
       "patternProperties": { "^x-": true },
@@ -203,6 +338,35 @@
     "language_map": {
       "type": "object",
       "description": "Left for minor versions (4.2): today only x- members.",
+      "patternProperties": { "^x-": true },
+      "additionalProperties": false
+    },
+    "localized": {
+      "type": "object", "required": ["source"],
+      "description": "A localized field (3); the rest of its object is left for minor versions.",
+      "properties": {
+        "source": { "$ref": "#/$defs/name", "description": "The language map of the same item whose text it carries." }
+      },
+      "patternProperties": { "^x-": true },
+      "additionalProperties": false
+    },
+    "local_time": {
+      "type": "object",
+      "description": "A field that holds local date-times (3, 4.2).",
+      "properties": {
+        "zone": { "$ref": "#/$defs/field_path", "description": "A timezone field of the item, or reached through a relationship; without it, a floating local time." }
+      },
+      "patternProperties": { "^x-": true },
+      "additionalProperties": false
+    },
+    "upload": {
+      "type": "object", "required": ["media_types"],
+      "description": "A POST to the collection MAY carry the bytes of a file instead of JSON (5.1).",
+      "properties": {
+        "media_types": { "type": "array", "items": { "$ref": "#/$defs/media_range" }, "minItems": 1, "uniqueItems": true },
+        "max_size": { "type": "integer", "minimum": 1, "description": "Largest file, in bytes; a larger one gives 413 content_too_large." },
+        "multipart": { "type": "boolean", "description": "true: the POST MAY carry multipart/form-data with exactly one part, named file (5.1)." }
+      },
       "patternProperties": { "^x-": true },
       "additionalProperties": false
     },
@@ -215,8 +379,8 @@
         "name": { "type": "string", "minLength": 1, "description": "What is retired: a name, a field, a filter field or a method, as the kind says." },
         "op": { "$ref": "#/$defs/op", "description": "The operator, for kind operator." },
         "value": { "description": "The enum value (value), the lower limit (max_limit) or \"estimated\" (count)." },
-        "announced": { "type": "string", "format": "date-time", "description": "When the notice was first published; it never changes." },
-        "sunset": { "type": "string", "format": "date-time", "description": "When it is removed, once there is a date." }
+        "announced": { "type": "string", "format": "date-time", "pattern": "^\\d{4}-\\d{2}-\\d{2}[Tt]\\d{2}:\\d{2}:\\d{2}([Zz]|[+-]\\d{2}:\\d{2})$", "description": "When the notice was first published, in whole seconds; it never changes (5.5)." },
+        "sunset": { "type": "string", "format": "date-time", "pattern": "^\\d{4}-\\d{2}-\\d{2}[Tt]\\d{2}:\\d{2}:\\d{2}([Zz]|[+-]\\d{2}:\\d{2})$", "description": "When it is removed, once there is a date, in whole seconds (5.5)." }
       },
       "patternProperties": { "^x-": true },
       "additionalProperties": false,
@@ -235,7 +399,8 @@
     "singleton": {
       "type": "object", "required": ["path"],
       "properties": {
-        "path": { "$ref": "#/$defs/path", "not": { "pattern": "[{}]" }, "description": "Never a template, nor a path that a collection or an item of one has or could have (5.9)." },
+        "path": { "$ref": "#/$defs/template_path", "description": "Never a path that a collection or an item of one has or could have; a template only with parent (5.9)." },
+        "parent": { "$ref": "#/$defs/name", "description": "The collection or singleton it hangs from; its path starts with the parent's item path, or the parent singleton's path, followed by / (5.9)." },
         "description": { "$ref": "#/$defs/description" },
         "methods": {
           "type": "array", "uniqueItems": true, "items": { "enum": ["GET", "PATCH"] }, "contains": { "const": "GET" },
@@ -250,14 +415,27 @@
           "patternProperties": { "^x-": true },
           "additionalProperties": false
         },
+        "actions": {
+          "type": "object",
+          "description": "Its actions, used at {path}:{name} (5.9, 11.1).",
+          "propertyNames": { "$ref": "#/$defs/name" },
+          "additionalProperties": { "$ref": "#/$defs/singleton_action" }
+        },
         "deprecations": {
           "type": "array",
-          "items": { "$ref": "#/$defs/deprecation", "properties": { "kind": { "enum": ["field", "method"] }, "name": { "type": "string" } },
-            "if": { "properties": { "kind": { "const": "method" } } }, "then": { "properties": { "name": { "enum": ["GET", "PATCH"] } } } }
-        }
+          "items": { "$ref": "#/$defs/deprecation", "properties": { "kind": { "enum": ["field", "method", "action"] }, "name": { "type": "string" } },
+            "if": { "properties": { "kind": { "const": "method" } } }, "then": { "properties": { "name": { "const": "PATCH" } } } }
+        },
+        "method_effects": {
+          "$ref": "#/$defs/method_effects", "propertyNames": { "const": "PATCH" },
+          "description": "Effects of its PATCH, the only key (4.3, 5.9); an undeclared PATCH has all three."
+        },
+        "shared_cache": { "$ref": "#/$defs/reserved_shared_cache" }
       },
       "patternProperties": { "^x-": true },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "if": { "not": { "required": ["parent"] } },
+      "then": { "properties": { "path": { "not": { "pattern": "[{}]" } } } }
     },
     "collection": {
       "type": "object", "required": ["path"],
@@ -267,6 +445,8 @@
         "description": { "$ref": "#/$defs/description" },
         "methods": { "$ref": "#/$defs/methods", "description": "Methods the collection supports (4.3); absent means unknown." },
         "item_methods": { "$ref": "#/$defs/methods", "description": "Methods its items support (4.3); absent means unknown." },
+        "method_effects": { "$ref": "#/$defs/method_effects", "description": "Effects of the collection's unsafe methods (4.3)." },
+        "item_method_effects": { "$ref": "#/$defs/method_effects", "description": "Effects of its items' unsafe methods (4.3)." },
         "schemas": {
           "type": "object",
           "properties": {
@@ -278,12 +458,15 @@
           "additionalProperties": false
         },
         "id_from": { "enum": ["server", "client", "either"], "description": "Who chooses an item's id; missing means server (5.1)." },
+        "reusable_ids": { "type": "boolean", "description": "With id_from client: the id of a deleted item is free again (5.1)." },
+        "upsert": { "type": "boolean", "description": "With id_from client or either: a PATCH to a free id creates the item (5.1)." },
+        "upload": { "$ref": "#/$defs/upload" },
         "filter": {
           "type": "object",
           "propertyNames": { "$ref": "#/$defs/field_path" },
           "additionalProperties": { "$ref": "#/$defs/filter" },
           "properties": {
-            "id": { "$ref": "#/$defs/filter", "properties": { "ops": { "items": { "enum": ["eq", "ne", "in", "null"] } } }, "description": "The order of ids is the server's: no lt, le, gt or ge (6.1)." }
+            "id": { "$ref": "#/$defs/filter", "properties": { "ops": { "items": { "enum": ["eq", "ne", "in", "nin", "null"] } } }, "description": "The order of ids is the server's: no lt, le, gt or ge; nor prefix or contains (6.1)." }
           }
         },
         "named_filters": {
@@ -295,7 +478,7 @@
         "sort": { "type": "array", "items": { "$ref": "#/$defs/field_path" }, "uniqueItems": true },
         "collations": {
           "type": "object",
-          "description": "How a string field or a translation field.tag is compared and sorted (6.1); a field not listed is codepoint.",
+          "description": "How a string field, an enum of strings listed in sort, a localized field or a translation field.tag is compared and sorted (6.1); a field not listed is codepoint.",
           "propertyNames": { "$ref": "#/$defs/field_path", "not": { "const": "id" } },
           "additionalProperties": { "enum": ["codepoint", "server"] }
         },
@@ -312,12 +495,25 @@
           "propertyNames": { "$ref": "#/$defs/name" },
           "additionalProperties": { "$ref": "#/$defs/language_map" }
         },
+        "localized": {
+          "type": "object",
+          "description": "Localized fields of the collection (3), all of them, each with its source.",
+          "propertyNames": { "$ref": "#/$defs/name" },
+          "additionalProperties": { "$ref": "#/$defs/localized" }
+        },
+        "local_times": {
+          "type": "object",
+          "description": "Fields of the collection that hold local date-times, and where each one's time zone comes from (4.2).",
+          "propertyNames": { "$ref": "#/$defs/name" },
+          "additionalProperties": { "$ref": "#/$defs/local_time" }
+        },
         "inherit": {
           "type": "object",
           "description": "Inherited fields (11.6): each key is an effective, read-only field.",
           "propertyNames": { "$ref": "#/$defs/name" },
           "additionalProperties": { "$ref": "#/$defs/inherit" }
         },
+        "inherit_items": { "$ref": "#/$defs/inherit_items" },
         "include_depth": { "type": "integer", "minimum": 1 },
         "sync": {
           "type": "object",
@@ -327,26 +523,74 @@
         "actions": {
           "type": "object",
           "propertyNames": { "$ref": "#/$defs/name", "not": { "const": "changes" } },
-          "additionalProperties": { "$ref": "#/$defs/action" }
+          "additionalProperties": { "$ref": "#/$defs/collection_action" },
+          "properties": {
+            "new": {
+              "allOf": [{ "$ref": "#/$defs/collection_action" }],
+              "required": ["method"],
+              "properties": { "on": { "const": "collection" }, "safe": { "const": true }, "method": { "const": "GET" } },
+              "description": "A reserved name: a collection's action named new is the one that gives the starting values of a new item and an effective schema, {\"values\": …, \"schema\": …}, a safe collection action used with GET (11.1)."
+            }
+          }
         },
         "deprecations": {
           "type": "array",
           "items": { "$ref": "#/$defs/deprecation", "properties": { "kind": { "enum": ["field", "filter", "operator", "value", "sort", "relation", "include", "count", "max_limit", "action", "method", "item_method"] } } }
-        }
+        },
+        "shared_cache": { "$ref": "#/$defs/reserved_shared_cache" }
       },
       "patternProperties": { "^x-": true },
       "additionalProperties": false,
       "allOf": [
         {
+          "description": "A synced collection declares id in filter with in, and has no required filter (10).",
           "if": { "required": ["sync"] },
           "then": {
             "required": ["filter"],
-            "properties": { "filter": { "required": ["id"], "properties": { "id": { "properties": { "ops": { "contains": { "const": "in" } } } } } } }
+            "properties": {
+              "filter": {
+                "required": ["id"],
+                "properties": { "id": { "properties": { "ops": { "contains": { "const": "in" } }, "required": { "const": false } } } },
+                "additionalProperties": { "properties": { "required": { "const": false } } }
+              },
+              "named_filters": { "additionalProperties": { "properties": { "required": { "const": false } } } }
+            }
           }
         },
         {
           "if": { "required": ["path"], "properties": { "path": { "pattern": "\\{" } } },
           "then": { "required": ["parent"] }
+        },
+        {
+          "description": "A collection whose methods leave out GET cannot be listed (4.3).",
+          "if": { "required": ["methods"], "properties": { "methods": { "not": { "contains": { "const": "GET" } } } } },
+          "then": { "not": { "anyOf": [{ "required": ["filter"] }, { "required": ["named_filters"] }, { "required": ["sort"] }, { "required": ["count"] }, { "required": ["sync"] }] } }
+        },
+        {
+          "description": "reusable_ids only with id_from client (5.1).",
+          "if": { "required": ["reusable_ids"], "properties": { "reusable_ids": { "const": true } } },
+          "then": { "required": ["id_from"], "properties": { "id_from": { "const": "client" } } }
+        },
+        {
+          "description": "upsert only with id_from client or either (5.1).",
+          "if": { "required": ["upsert"], "properties": { "upsert": { "const": true } } },
+          "then": { "required": ["id_from"], "properties": { "id_from": { "enum": ["client", "either"] } } }
+        },
+        {
+          "description": "Only a subcollection declares inherit_items (11.6).",
+          "if": { "required": ["inherit_items"] },
+          "then": { "required": ["parent"] }
+        },
+        {
+          "description": "A collection that takes files and creates items from JSON (upload with schemas.create) and whose media_types admit application/json, also by a wildcard, declares multipart true: a JSON file only travels as the file part of multipart/form-data (5.1).",
+          "if": {
+            "required": ["upload", "schemas"],
+            "properties": {
+              "schemas": { "required": ["create"] },
+              "upload": { "properties": { "media_types": { "contains": { "pattern": "^([Aa][Pp][Pp][Ll][Ii][Cc][Aa][Tt][Ii][Oo][Nn]/([Jj][Ss][Oo][Nn]|\\*)|\\*/\\*)$" } } } }
+            }
+          },
+          "then": { "properties": { "upload": { "required": ["multipart"], "properties": { "multipart": { "const": true } } } } }
         }
       ]
     }
